@@ -14,7 +14,8 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Sigym4.Dimension
-  -- other-modules:       
+  other-modules:     Sigym4.Dimension.Types
+                   , Sigym4.Dimension.Time
   -- other-extensions:    
   build-depends:     base >=4.7 && <4.8
                    , attoparsec
