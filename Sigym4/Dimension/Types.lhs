@@ -28,13 +28,13 @@ porque no se pueden expresar con Haskell2010.
 >            #-}
 > 
 
-TODO: Falta definir el interfaz del módulo.
+Se define el interfaz del módulo y se importan las librerías necesarias.
 
-> module Sigym4.Dimension.Types where
-
-Nos quitamos lo antes posible la importación de las librerías que
-utilizaremos.
- 
+> module Sigym4.Dimension.Types (
+>     Dimension(..)
+>   , BoundedDimension(..)
+>   , (:>)
+> ) where
 > import Data.Typeable (Typeable)
 
 
@@ -160,14 +160,15 @@ dimensiones y sus índices. La definición es similar a la de una tupla.
 >           EQ -> b `compare` b'
 >           o  -> o
 
-Finalmete definimos cualquier producto de dimensiones como una dimensión.
-Notese que es necesario que la "cola" de dimensiones no sea infinita aunque
-la cabeza (y sólo la cabeza) puede serlo. Ésto es así porque si no sería
-imposible determinar cuando se ha terminado de iterar las dimensiones interiores
-para pasar a las exteriores.
+Definimos cualquier producto de dimensiones como una dimensión.
 
-Esta invariante la garantiza el sistema de tipos requiriendo `BoundedDimension`
-en la variable de tipo `a`. Lo que no evita es una instancia mal implementada.
+Notese que es necesario que la "cola" de dimensiones
+(ie: las dimensiones interiores) no sea infinita aunque la cabeza
+(la dimensión exterior) sí puede serlo.  Esta invariante la garantiza el
+sistema de tipos requiriendo `BoundedDimension` en la variable de tipo `a`.
+Ésto es así porque si no sería imposible determinar cuando se ha terminado de
+iterar las dimensiones interiores para pasar a la exterior.
+
 
 > instance (BoundedDimension a, Dimension b) => Dimension (a :> b) where
 >     type DimensionIx (a :> b) = DimensionIx a :> DimensionIx b
@@ -202,6 +203,15 @@ en la variable de tipo `a`. Lo que no evita es una instancia mal implementada.
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dfirst da :> b')
 
-> instance (BoundedDimension a, BoundedDimension b) => BoundedDimension (a :> b) where
+El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
+
+> instance (BoundedDimension a, BoundedDimension b) => BoundedDimension (a :> b)
+>   where
 >     dfirst (a :> b) = dfirst a :> dfirst b
 >     dlast  (a :> b) = dlast a  :> dlast b
+
+Las dos instancias anteriores constituyen una prueba inductiva que permite al
+compilador determinar que cualquier producto de 'Dimension' de longitud N es
+una 'Dimension' siempre que el producto (N-1) sea 'BoundedDimension'.
+El hecho de que ésto compile demuestra que es cierto
+(ver: /http://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence)
