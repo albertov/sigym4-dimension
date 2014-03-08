@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
 import Test.Hspec
@@ -6,8 +6,10 @@ import Test.Hspec.QuickCheck
 import Sigym4.Dimension
 import Data.Time.Calendar
 import Data.Time.Clock
+import Data.List as L
 import Test.QuickCheck
 import System.Cron
+import GHC.Exts (fromList)
 
 main :: IO ()
 main = hspec spec
@@ -15,9 +17,26 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "denumUp" $ do
-    it "returns only elements of dimension" $ property $
-        \((d::Schedule ObservationTime), i) ->
-            all (`delem` d) $ take 100 $ denumUp d i
+
+    context "Schedule ObservationTime" $ do
+
+        it "returns only elements of dimension" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                all (`delem` d) $ take 10 $ denumUp d i
+
+        it "elements are sorted" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                let elems = take 10 $ denumUp d i
+                in L.sort elems == elems
+
+    context "Horizons :> Schedule ObservationTime" $ do
+
+        it "returns only elements of product dimension" $ property $
+            \((d :: Horizons :> Schedule ObservationTime), i) ->
+                all (`delem` d) $ take 10 $ denumUp d i
+
+
+
 
 instance Arbitrary ObservationTime where
     arbitrary = fromUTCTime <$> arbitrary
@@ -27,18 +46,31 @@ instance Arbitrary UTCTime where
       = UTCTime <$> (ModifiedJulianDay <$> arbitrary)
                 <*> (fromIntegral      <$> (arbitrary :: Gen (NonNegative Int)))
 
+instance (Arbitrary a, Arbitrary b) => Arbitrary (a :> b) where
+    arbitrary = (:>) <$> arbitrary <*> arbitrary
+
+instance Arbitrary Horizons where
+    arbitrary = fromList <$> listOf1 arbitrary
+
+instance Arbitrary Horizon where
+    arbitrary = Minute <$> arbitrary
+
 instance Arbitrary (Schedule t) where
     arbitrary = Schedule <$> arbitrary
 
 instance Arbitrary CronSchedule where
     arbitrary = CronSchedule <$> arbitrary
                              <*> arbitrary
+                             -- Los siguientes deberían ser arbitrary pero
+                             -- es MUY lento. Hay que optimizar
+                             -- denumUp/denumDown para que sean más listos
+                             -- generando
                              <*> pure (DaysOfMonth Star)
                              <*> pure (Months Star)
                              <*> pure (DaysOfWeek Star)
 
 instance Arbitrary DayOfWeekSpec where
-    arbitrary = DaysOfWeek <$> pure Star -- FIXME
+    arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)
 instance Arbitrary DayOfMonthSpec where
     arbitrary = DaysOfMonth <$> arbitraryCronField (1,31)
 instance Arbitrary MonthSpec where

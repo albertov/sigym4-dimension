@@ -33,7 +33,7 @@ Se define el interfaz del módulo y se importan las librerías necesarias.
 > module Sigym4.Dimension.Types (
 >     Dimension(..)
 >   , BoundedDimension(..)
->   , (:>)
+>   , (:>)(..)
 > ) where
 > import Data.Typeable (Typeable)
 
