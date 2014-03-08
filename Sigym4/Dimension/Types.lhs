@@ -156,8 +156,8 @@ dimensiones y sus índices. La definición es similar a la de una tupla.
 
 > instance (Ord a, Ord b) => Ord (a :> b) where
 >     (a :> b) `compare` (a' :> b')
->       = case a `compare` a' of
->           EQ -> b `compare` b'
+>       = case b `compare` b' of
+>           EQ -> a `compare` a'
 >           o  -> o
 
 Definimos cualquier producto de dimensiones como una dimensión.
@@ -182,13 +182,6 @@ iterar las dimensiones interiores para pasar a la exterior.
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dlast da :> b')
 > 
->     dfloor (da :> db) (a :> b)
->       = case dfloor da a of
->           Just a' -> Just (a' :> b)
->           Nothing -> case dfloor db b of
->                        Nothing -> Nothing
->                        Just b' -> Just (dlast da :> b')
-> 
 >     dsucc (da :> db) (a :> b)
 >       = case dsucc da a of
 >           Just a' -> Just (a' :> b)
@@ -196,12 +189,17 @@ iterar las dimensiones interiores para pasar a la exterior.
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dfirst da :> b')
 > 
->     dceiling (da :> db) (a :> b)
->       = case dceiling da a of
->           Just a' -> Just (a' :> b)
->           Nothing -> case dceiling db b of
->                        Nothing -> Nothing
->                        Just b' -> Just (dfirst da :> b')
+>     dfloor (da :> db) (a :> b) = do
+>       b' <- dfloor db b
+>       case dfloor da a of
+>         Just a' -> Just (a' :> b')
+>         Nothing -> Just (dlast da :> b')
+> 
+>     dceiling (da :> db) (a :> b) = do
+>       b' <- dceiling db b
+>       case dfloor da a of
+>         Just a' -> Just (a' :> b')
+>         Nothing -> Just (dfirst da :> b')
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 

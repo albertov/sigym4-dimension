@@ -24,19 +24,54 @@ spec = do
             \((d::Schedule ObservationTime), i) ->
                 all (`delem` d) $ take 10 $ denumUp d i
 
-        it "elements are sorted" $ property $
+        it "returns sorted elements" $ property $
             \((d::Schedule ObservationTime), i) ->
                 let elems = take 10 $ denumUp d i
                 in L.sort elems == elems
 
-    context "Horizons :> Schedule ObservationTime" $ do
+    context "Horizons :> Schedule RunTime" $ do
 
         it "returns only elements of product dimension" $ property $
             \((d :: Horizons :> Schedule ObservationTime), i) ->
                 all (`delem` d) $ take 10 $ denumUp d i
 
+        it "returns sorted elements" $ property $
+            \((d :: Horizons :> Schedule RunTime), i) ->
+                let elems = take 10 $ denumUp d i
+                in L.sort elems == elems
+
+  describe "denumDown" $ do
+
+    context "Schedule ObservationTime" $ do
+
+        it "returns only elements of dimension" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                all (`delem` d) $ take 10 $ denumDown d i
+
+        it "returns reversely sorted elements" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                let elems = take 10 $ denumDown d i
+                in L.sort elems == reverse elems
+
+    context "Horizons :> Schedule RunTime" $ do
+
+        it "returns only elements of product dimension" $ property $
+            \((d :: Horizons :> Schedule ObservationTime), i) ->
+                all (`delem` d) $ take 10 $ denumDown d i
+
+        it "returns reversely sorted elements" $ property $
+            \((d :: Horizons :> Schedule RunTime), i) ->
+                let elems = take 10 $ denumDown d i
+                in L.sort elems == reverse elems
 
 
+-- A continuación se implementan instancias de Arbitrary de varios tipos
+-- para poder generar valores aleatorios para tests de propiedades
+instance Arbitrary ForecastTime where
+    arbitrary = fromUTCTime <$> arbitrary
+
+instance Arbitrary RunTime where
+    arbitrary = fromUTCTime <$> arbitrary
 
 instance Arbitrary ObservationTime where
     arbitrary = fromUTCTime <$> arbitrary
@@ -94,4 +129,5 @@ arbitraryCronField range
     listField     = ListField  <$>
                        listOf1 (oneof [star,specificField,rangeField
                                       ,stepField])
-    stepField     = StepField  <$> star <*> choose (1,snd range)
+    stepField     = StepField  <$> star <*> choose ( max 1 (fst range)
+                                                   , snd range)
