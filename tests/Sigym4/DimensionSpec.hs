@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables, TypeOperators, FlexibleContexts #-}
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
 import Test.Hspec
@@ -7,6 +7,7 @@ import Sigym4.Dimension
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.List as L
+import Data.Maybe (isJust)
 import Test.QuickCheck
 import System.Cron
 import GHC.Exts (fromList)
@@ -16,6 +17,97 @@ main = hspec spec
 
 spec :: Spec
 spec = do
+  describe "dfloor" $ do
+
+    context "Schedule ObservationTime" $ do
+
+        it "returns an element of dimension" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                fmap (`delem` d) (dfloor d i) == Just True
+
+        it "is transitive for ordering" $ property $
+            \((d::Schedule ObservationTime), (a,b,c)) ->
+              let fa'     = dfloor d a
+                  fb'     = dfloor d b
+                  fc'     = dfloor d c
+                  Just fa = fa'
+                  Just fb = fb'
+                  Just fc = fc'
+              in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
+                ((fa `compare` fb) `elem` [EQ, LT])
+                  &&
+                ((fb `compare` fc) `elem` [EQ, LT])
+                  &&
+                ((fa `compare` fc) `elem` [EQ, LT])
+
+
+    context "Horizons :> Schedule RunTime" $ do
+
+        it "returns an element of dimension" $ property $
+            \((d :: Horizons :> Schedule RunTime), i) ->
+                fmap (`delem` d) (dfloor d i) == Just True
+
+        it "is transitive for ordering" $ property $
+            \((d :: Horizons :> Schedule RunTime), (a,b,c)) ->
+              let fa'     = dfloor d a
+                  fb'     = dfloor d b
+                  fc'     = dfloor d c
+                  Just fa = fa'
+                  Just fb = fb'
+                  Just fc = fc'
+              in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
+                ((fa `compare` fb) `elem` [EQ, LT])
+                  &&
+                ((fb `compare` fc) `elem` [EQ, LT])
+                  &&
+                ((fa `compare` fc) `elem` [EQ, LT])
+
+  describe "dceiling" $ do
+
+    context "Schedule ObservationTime" $ do
+
+        it "returns an element of dimension" $ property $
+            \((d::Schedule ObservationTime), i) ->
+                fmap (`delem` d) (dceiling d i) == Just True
+
+        it "is transitive for ordering" $ property $
+            \((d::Schedule ObservationTime), (a,b,c)) ->
+              let fa'     = dceiling d a
+                  fb'     = dceiling d b
+                  fc'     = dceiling d c
+                  Just fa = fa'
+                  Just fb = fb'
+                  Just fc = fc'
+              in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
+                ((fa `compare` fb) `elem` [EQ, GT])
+                  &&
+                ((fb `compare` fc) `elem` [EQ, GT])
+                  &&
+                ((fa `compare` fc) `elem` [EQ, GT])
+
+
+    context "Horizons :> Schedule RunTime" $ do
+
+        it "returns an element of dimension" $ property $
+            \((d :: Horizons :> Schedule RunTime), i) ->
+                fmap (`delem` d) (dceiling d i) == Just True
+
+        it "is transitive for ordering" $ property $
+            \((d :: Horizons :> Schedule RunTime), (a,b,c)) ->
+              let fa'     = dceiling d a
+                  fb'     = dceiling d b
+                  fc'     = dceiling d c
+                  Just fa = fa'
+                  Just fb = fb'
+                  Just fc = fc'
+              in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
+                ((fa `compare` fb) `elem` [EQ, GT])
+                  &&
+                ((fb `compare` fc) `elem` [EQ, GT])
+                  &&
+                ((fa `compare` fc) `elem` [EQ, GT])
+
+
   describe "denumUp" $ do
 
     context "Schedule ObservationTime" $ do
@@ -76,10 +168,13 @@ instance Arbitrary RunTime where
 instance Arbitrary ObservationTime where
     arbitrary = fromUTCTime <$> arbitrary
 
+nonNeg :: Gen (NonNegative Int)
+nonNeg = arbitrary
+
 instance Arbitrary UTCTime where
     arbitrary
-      = UTCTime <$> (ModifiedJulianDay <$> arbitrary)
-                <*> (fromIntegral      <$> (arbitrary :: Gen (NonNegative Int)))
+      = UTCTime <$> (ModifiedJulianDay . fromIntegral <$> nonNeg)
+                <*> (fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int))
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (a :> b) where
     arbitrary = (:>) <$> arbitrary <*> arbitrary
@@ -88,7 +183,7 @@ instance Arbitrary Horizons where
     arbitrary = fromList <$> listOf1 arbitrary
 
 instance Arbitrary Horizon where
-    arbitrary = Minute <$> arbitrary
+    arbitrary = Minute . fromIntegral <$> nonNeg
 
 instance Arbitrary (Schedule t) where
     arbitrary = Schedule <$> arbitrary
