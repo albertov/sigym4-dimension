@@ -120,18 +120,6 @@ parseando la cadena durante la compilación.
 >                      Left  e -> error $ "fromString(Schedule): " ++ e
 > 
 
-Definimos un tipo para índices periódicos en un intervalo cerrado.
-
-> data BoundedSchedule t where
->     BoundedSchedule :: Time t => {
->         bsFirst    :: t
->       , bsLast     :: t
->       , bsSchedule :: Schedule t
->     } -> BoundedSchedule t
-> 
-> deriving instance Show (BoundedSchedule t)
-> deriving instance Eq   (BoundedSchedule t)
-
 Definimos una instancia de 'Dimension' para 'Schedule's de
 cualquier tipo de tiempo. Ojo, es bastante ineficiente aunque en Sigym3 no es
 de lo que más duele. Se podría mejorar inspeccionando el `CronSchedule` y
@@ -150,39 +138,6 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 >   where
 >     go t | s `matches` t = t
 >          | otherwise     = go (addHorizon d t)
-> 
-
-Definimos una instancia de `Dimension` y `BoundedDimension` para
-`BoundedSchedule`s de cualquier tipo de tiempo.
-
-> instance Time t => Dimension (BoundedSchedule t) where
->     type DimensionIx (BoundedSchedule t) = t
-> 
->     delem t bs = delem t (bsSchedule bs)
-> 
->     dpred bs t
->       = case dpred (bsSchedule bs) t of
->           Just p | p >= bsFirst bs  -> Just p
->           _                         -> Nothing
-> 
->     dsucc bs t
->       = case dsucc (bsSchedule bs) t of
->           Just p | p <= bsLast bs  -> Just p
->           _                        -> Nothing
-> 
->     dfloor bs t
->       = case dfloor (bsSchedule bs) t of
->           Just p | p >= bsFirst bs  -> Just p
->           _                         -> Nothing
-> 
->     dceiling bs t
->       = case dceiling (bsSchedule bs) t of
->           Just p | p <= bsLast bs  -> Just p
->           _                        -> Nothing
-> 
-> instance Time t => BoundedDimension (BoundedSchedule t) where
->     dlast  = const . bsLast
->     dfirst = const . bsFirst
 > 
 
 Horizontes
