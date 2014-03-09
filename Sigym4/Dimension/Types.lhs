@@ -177,18 +177,22 @@ iterar las dimensiones interiores para pasar a la exterior.
 >     delem (a :> b) (da :> db) = a `delem` da && b `delem` db
 > 
 >     dpred (da :> db) (a :> b)
+>       | b `delem` db
 >       = case dpred da a of
 >           Just a' -> Just (a' :> b)
 >           Nothing -> case dpred db b of
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dlast da :> b')
+>       | otherwise  = dfloor db b >>= \b' -> dpred (da :> db) (a :> b')
 > 
 >     dsucc (da :> db) (a :> b)
+>       | b `delem` db
 >       = case dsucc da a of
 >           Just a' -> Just (a' :> b)
 >           Nothing -> case dsucc db b of
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dfirst da :> b')
+>       | otherwise  = dceiling db b >>= \b' -> dsucc (da :> db) (a :> b')
 > 
 >     dfloor (da :> db) (a :> b)
 >       | b `delem` db
