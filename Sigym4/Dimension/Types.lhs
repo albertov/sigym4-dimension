@@ -190,17 +190,15 @@ iterar las dimensiones interiores para pasar a la exterior.
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dfirst da :> b')
 > 
->     dfloor (da :> db) (a :> b) = do
->       b' <- dfloor db b
->       case dfloor da a of
->         Just a' -> Just (a' :> b')
->         Nothing -> Just (dlast da :> b')
+>     dfloor (da :> db) (a :> b)
+>       = case dfloor da a of
+>           Just a' -> dfloor   db b >>= \b' -> Just (a'       :> b')
+>           Nothing -> dceiling db b >>= \b' -> Just (dlast da :> b')
 > 
->     dceiling (da :> db) (a :> b) = do
->       b' <- dceiling db b
->       case dfloor da a of
->         Just a' -> Just (a' :> b')
->         Nothing -> Just (dfirst da :> b')
+>     dceiling (da :> db) (a :> b)
+>       = case dceiling da a of
+>           Just a' -> dceiling db b >>= \b' -> Just (a'        :> b')
+>           Nothing -> dfloor   db b >>= \b' -> Just (dfirst da :> b')
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
