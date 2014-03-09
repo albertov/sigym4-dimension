@@ -117,8 +117,9 @@ inferior y superior, ambas cerradas.
 > class Dimension d => BoundedDimension d where
 >     dfirst   :: d -> DimensionIx d
 >     dlast    :: d -> DimensionIx d
->
 >     {-# MINIMAL dfirst, dlast #-}
+>     denum    :: d -> [DimensionIx d]
+>     denum d = denumUp d (dfirst d)
 
 
 Comenzamos definiendo algunas instancias de Dimensiones típicas, la primera

@@ -124,7 +124,8 @@ arbitraryCronField range
     rangeField    = do
         lo <- choose range
         hi <- choose range
-        if lo<hi then return $ RangeField lo hi
+        if lo<hi
+        then return $ RangeField lo hi
         else rangeField
     listField     = ListField  <$>
                        listOf1 (oneof [star,specificField,rangeField

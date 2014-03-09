@@ -1,3 +1,6 @@
+Tiempos
+-------
+
 > {-# LANGUAGE GADTs
 >            , GeneralizedNewtypeDeriving
 >            , StandaloneDeriving
@@ -6,25 +9,30 @@
 >            #-}
 > 
 
-> module Sigym4.Dimension.Time where
+> module Sigym4.Dimension.Time (
+>     Time(..)
+>   , ForecastTime
+>   , ObservationTime
+>   , RunTime
+>   , Horizon (..)
+>   , Horizons
+>   , Schedule (..)
+> ) where
 
-> import Data.Typeable (Typeable)
 > import Data.String (IsString(fromString))
-> import System.Cron (CronSchedule, scheduleMatches)
-> import System.Cron.Parser (cronSchedule)
 > import Data.Attoparsec.Text (parseOnly)
-
 > import Data.Time.Clock (UTCTime(..), NominalDiffTime, addUTCTime)
 > import Data.Time ()
+> import Data.Typeable (Typeable)
+> import System.Cron (CronSchedule, scheduleMatches)
+> import System.Cron.Parser (cronSchedule)
 > import GHC.Exts (IsList (..))
-> import qualified Data.List as L
+> import Data.List (sort, nub)
 > import Sigym4.Dimension.Types
-
-Tiempos
--------
 
 Preparamos el terreno para definir las dimensiones temporales creando tipos
 para los distintos tipos de tiempo, todos son envoltorios de 'UTCTime'
+
  
 ObservationTime es el tiempo asociado a una observación.
 
@@ -101,8 +109,10 @@ Definimos un tipo para poder definir índices temporales periódicos.
 > newtype Schedule t = Schedule CronSchedule deriving (Eq, Show, Typeable)
 
  
-Lo hacemos de la clase 'IsString' para poder escribir constantes como
-cadenas de texto en formato de "cron".
+Lo hacemos de la clase `IsString` para poder escribir constantes como
+cadenas de texto en formato de "cron". Ojo, dará error en ejecución
+una cadena en formato incorrecto. Se puede arreglar con Template Haskell
+parseando la cadena durante la compilación.
 
 > instance IsString (Schedule t) where
 >     fromString s = case parseOnly cronSchedule (fromString s) of
@@ -194,11 +204,6 @@ y operar con ellos.
 > minutes (Hour h)   = h * 60
 > minutes (Minute m) = m
 
-Definimos como convertir cualquier tipo de horizonte en minutos.
- 
-> asMinute :: Horizon -> Horizon
-> asMinute = Minute . minutes
-
 Definimos instancias para poder comparar horizontes.
  
 > instance Eq Horizon where
@@ -249,18 +254,32 @@ como ellos como si fuesen números y para poder escribirlos como números.
 > toNominalDiffTime :: Horizon -> NominalDiffTime
 > toNominalDiffTime = fromIntegral . (* 60) . minutes
 
-A continuación definimos una lista horizontes como una dimensión finita
+Definimos un `newtype` para una lista de horizontes sin exportar su constructor.
+Ésto lo hacemos para controlar su construcción en `fromList` la cual verifica
+que no es una lista vacía para que el resto del código lo pueda asumir con
+seguridad.
+
+Encapsularlo con un `newtype` también permite poder cambiar la implementación
+sin afectar al código que lo use, por ejemplo, si se da el caso de conjuntos
+de muchos horizontes se puede cambiar la lista por un árbol binario que es
+O(log n) en vez de O(n) en `dpred`, `dsucc`, `dfloor` y `dceiling`.
 
 > newtype Horizons = Horizons [Horizon] deriving (Eq,Ord,Show,Read,Typeable)
-> 
+
+Definimos una instancia de `IsList` para poder escribir constantes como listas
+habilitando la extension `XOverloadedLists`. Ojo, dará error en tiempo de
+ejecución una lista vacía, también se puede arreglar con TemplateHaskell.
+
 > instance IsList Horizons where
 >     type Item Horizons  = Horizon
 >     fromList l
 >         | null l    = error "fromList(Horizons): Cannot be an empty list"
->         | otherwise = Horizons . L.nub . L.sort $ l
+>         | otherwise = Horizons . nub . sort $ l
 >     toList (Horizons l) = l
-> 
-> 
+ 
+A continuación se definen las instancias para que `Horizons` sea una dimensión
+finita (`BoundedDimension`).
+ 
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
 >     delem d (Horizons ds) = d `elem` ds
@@ -284,4 +303,4 @@ A continuación definimos una lista horizontes como una dimensión finita
 > instance BoundedDimension Horizons where
 >     dfirst (Horizons ds) = head ds
 >     dlast  (Horizons ds) = last ds
-> 
+>     denum  (Horizons ds) = ds
