@@ -152,8 +152,8 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 >          | otherwise     = go (addHorizon d t)
 > 
 
-Definimos una instancia de 'Dimension' y 'BoundedDimension' para
-'BoundedSchedule's de cualquier tipo de tiempo.
+Definimos una instancia de `Dimension` y `BoundedDimension` para
+`BoundedSchedule`s de cualquier tipo de tiempo.
 
 > instance Time t => Dimension (BoundedSchedule t) where
 >     type DimensionIx (BoundedSchedule t) = t
@@ -181,8 +181,8 @@ Definimos una instancia de 'Dimension' y 'BoundedDimension' para
 >           _                        -> Nothing
 > 
 > instance Time t => BoundedDimension (BoundedSchedule t) where
->     dlast  = bsLast
->     dfirst = bsFirst
+>     dlast  = const . bsLast
+>     dfirst = const . bsFirst
 > 
 
 Horizontes
@@ -301,6 +301,7 @@ finita (`BoundedDimension`).
 >           (x:_) -> Just x
 > 
 > instance BoundedDimension Horizons where
->     dfirst (Horizons ds) = head ds
->     dlast  (Horizons ds) = last ds
->     denum  (Horizons ds) = ds
+>     type Dependent Horizons = RunTime
+>     dfirst (Horizons ds) = const $ head ds
+>     dlast  (Horizons ds) = const $ last ds
+>     denum  (Horizons ds) = const ds

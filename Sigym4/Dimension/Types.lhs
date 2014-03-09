@@ -115,11 +115,12 @@ inferior y superior, ambas cerradas.
 > --   The implementation of 'dsucc', 'dpred', 'dceiling' and 'dfloor' from
 > --   'Dimension a' must return 'Nothing' when out of bounds
 > class Dimension d => BoundedDimension d where
->     dfirst   :: d -> DimensionIx d
->     dlast    :: d -> DimensionIx d
+>     type Dependent d
+>     dfirst   :: d -> Dependent d -> DimensionIx d
+>     dlast    :: d -> Dependent d -> DimensionIx d
 >     {-# MINIMAL dfirst, dlast #-}
->     denum    :: d -> [DimensionIx d]
->     denum d = denumUp d (dfirst d)
+>     denum    :: d -> Dependent d -> [DimensionIx d]
+>     denum d d2 = denumUp d (dfirst d d2)
 
 
 Comenzamos definiendo algunas instancias de Dimensiones típicas, la primera
@@ -135,8 +136,9 @@ indexar datos estáticos.
 >     dceiling _ _ = Just ()
 > 
 > instance BoundedDimension () where
->     dfirst   _   = ()
->     dlast    _   = ()
+>     type Dependent () = ()
+>     dfirst _ _  = ()
+>     dlast  _ _  = ()
 > 
 
 
@@ -171,7 +173,8 @@ sistema de tipos requiriendo `BoundedDimension` en la variable de tipo `a`.
 iterar las dimensiones interiores para pasar a la exterior.
 
 
-> instance (BoundedDimension a, Dimension b) => Dimension (a :> b) where
+> instance (BoundedDimension a, Dimension b, DimensionIx b ~ Dependent a)
+>   => Dimension (a :> b) where
 >     type DimensionIx (a :> b) = DimensionIx a :> DimensionIx b
 > 
 >     delem (a :> b) (da :> db) = a `delem` da && b `delem` db
@@ -182,7 +185,7 @@ iterar las dimensiones interiores para pasar a la exterior.
 >           Just a' -> Just (a' :> b)
 >           Nothing -> case dpred db b of
 >                        Nothing -> Nothing
->                        Just b' -> Just (dlast da :> b')
+>                        Just b' -> Just (dlast da b' :> b')
 >       | otherwise  = dfloor db b >>= \b' -> dpred (da :> db) (a :> b')
 > 
 >     dsucc (da :> db) (a :> b)
@@ -191,32 +194,29 @@ iterar las dimensiones interiores para pasar a la exterior.
 >           Just a' -> Just (a' :> b)
 >           Nothing -> case dsucc db b of
 >                        Nothing -> Nothing
->                        Just b' -> Just (dfirst da :> b')
+>                        Just b' -> Just (dfirst da b' :> b')
 >       | otherwise  = dceiling db b >>= \b' -> dsucc (da :> db) (a :> b')
 > 
 >     dfloor (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dfloor da a of
 >           Just a' -> dfloor db b >>= \b' -> Just (a' :> b')
->           Nothing -> dpred  db b >>= \b' -> Just (dlast da :> b')
->       | otherwise  = dfloor db b >>= \b' -> Just (dlast da :> b')
+>           Nothing -> dpred  db b >>= \b' -> Just (dlast da b' :> b')
+>       | otherwise  = dfloor db b >>= \b' -> Just (dlast da b' :> b')
 > 
 >     dceiling (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dceiling da a of
 >           Just a' -> dceiling db b >>= \b' -> Just (a' :> b')
->           Nothing -> dsucc  db b   >>= \b' -> Just (dfirst da :> b')
->       | otherwise  = dceiling db b >>= \b' -> Just (dfirst da :> b')
+>           Nothing -> dsucc  db b   >>= \b' -> Just (dfirst da b' :> b')
+>       | otherwise  = dceiling db b >>= \b' -> Just (dfirst da b' :> b')
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
-> instance (BoundedDimension a, BoundedDimension b) => BoundedDimension (a :> b)
+> instance ( BoundedDimension a, BoundedDimension b
+>          , DimensionIx b ~ Dependent a)
+>   => BoundedDimension (a :> b)
 >   where
->     dfirst (a :> b) = dfirst a :> dfirst b
->     dlast  (a :> b) = dlast a  :> dlast b
-
-Las dos instancias anteriores constituyen una prueba inductiva que permite al
-compilador determinar que cualquier producto de 'Dimension' de longitud N es
-una 'Dimension' siempre que el producto (N-1) sea 'BoundedDimension'.
-El hecho de que ésto compile demuestra que es cierto
-(ver: /http://en.wikipedia.org/wiki/Curry%E2%80%93Howard_correspondence)
+>     type Dependent (a :> b) = Dependent a :> Dependent b
+>     dfirst (a :> b) (ca :> cb) = dfirst a ca :> dfirst b cb
+>     dlast  (a :> b) (ca :> cb) = dlast  a ca :> dlast  b cb

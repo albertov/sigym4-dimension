@@ -194,7 +194,7 @@ spec = do
     context "Horizons :> Schedule RunTime" $ do
 
         it "returns only elements of product dimension" $ property $
-            \((d :: Horizons :> Schedule ObservationTime), i) ->
+            \((d :: Horizons :> Schedule RunTime), i) ->
                 all (`delem` d) $ take 10 $ denumUp d i
 
         it "returns sorted elements" $ property $
@@ -228,7 +228,7 @@ spec = do
     context "Horizons :> Schedule RunTime" $ do
 
         it "returns only elements of product dimension" $ property $
-            \((d :: Horizons :> Schedule ObservationTime), i) ->
+            \((d :: Horizons :> Schedule RunTime), i) ->
                 all (`delem` d) $ take 10 $ denumDown d i
 
         it "returns reversely sorted elements" $ property $
