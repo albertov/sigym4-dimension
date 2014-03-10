@@ -16,6 +16,7 @@ import GHC.Exts (fromList)
 main :: IO ()
 main = hspec spec
 
+takeSample = take 500
 spec :: Spec
 spec = do
   describe "dsucc" $ do
@@ -180,32 +181,32 @@ spec = do
 
         it "returns only elements of dimension" $ property $
             \((d::Schedule ObservationTime), i) ->
-                all (`delem` d) $ take 10 $ denumUp d i
+                all (`delem` d) $ takeSample $ denumUp d i
 
         it "returns sorted elements" $ property $
             \((d::Schedule ObservationTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.sort elems == elems
 
         it "does not return duplicate elements" $ property $
             \((d::Schedule ObservationTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.nub elems == elems
 
     context "Horizons :> Schedule RunTime" $ do
 
         it "returns only elements of product dimension" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                all (`delem` d) $ take 10 $ denumUp d i
+                all (`delem` d) $ takeSample $ denumUp d i
 
         it "returns sorted elements" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.sort elems == elems
 
         it "does not return duplicate elements" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.nub elems == elems
 
   describe "denumDown" $ do
@@ -214,32 +215,32 @@ spec = do
 
         it "returns only elements of dimension" $ property $
             \((d::Schedule ObservationTime), i) ->
-                all (`delem` d) $ take 10 $ denumDown d i
+                all (`delem` d) $ takeSample $ denumDown d i
 
         it "returns reversely sorted elements" $ property $
             \((d::Schedule ObservationTime), i) ->
-                let elems = take 10 $ denumDown d i
+                let elems = takeSample $ denumDown d i
                 in L.sort elems == reverse elems
 
         it "does not return duplicate elements" $ property $
             \((d::Schedule ObservationTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.nub elems == elems
 
     context "Horizons :> Schedule RunTime" $ do
 
         it "returns only elements of product dimension" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                all (`delem` d) $ take 10 $ denumDown d i
+                all (`delem` d) $ takeSample $ denumDown d i
 
         it "returns reversely sorted elements" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = take 10 $ denumDown d i
+                let elems = takeSample $ denumDown d i
                 in L.sort elems == reverse elems
 
         it "does not return duplicate elements" $ property $
             \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = take 10 $ denumUp d i
+                let elems = takeSample $ denumUp d i
                 in L.nub elems == elems
 
 
@@ -277,18 +278,14 @@ instance Arbitrary (Schedule t) where
 instance Arbitrary CronSchedule where
     arbitrary = CronSchedule <$> arbitrary
                              <*> arbitrary
-                             -- Los siguientes deberían ser arbitrary pero
-                             -- es MUY lento. Hay que optimizar
-                             -- denumUp/denumDown para que sean más listos
-                             -- generando
-                             <*> pure (DaysOfMonth Star)
-                             <*> pure (Months Star)
+                             <*> arbitrary
+                             <*> arbitrary
                              <*> pure (DaysOfWeek Star)
 
 instance Arbitrary DayOfWeekSpec where
     arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)
 instance Arbitrary DayOfMonthSpec where
-    arbitrary = DaysOfMonth <$> arbitraryCronField (1,31)
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28)
 instance Arbitrary MonthSpec where
     arbitrary = Months <$> arbitraryCronField (1,12)
 instance Arbitrary MinuteSpec where
@@ -298,7 +295,7 @@ instance Arbitrary HourSpec where
 
 arbitraryCronField :: (Int,Int) -> Gen CronField
 arbitraryCronField range
-  = oneof [star,specificField,rangeField,listField,stepField]
+  = oneof [star,specificField,stepField]--,rangeField,listField]
   where
     specificField = SpecificField <$> choose range
     star          = pure Star
