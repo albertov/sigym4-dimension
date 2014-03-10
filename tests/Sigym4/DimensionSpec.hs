@@ -19,6 +19,11 @@ main = hspec spec
 takeSample = take 500
 spec :: Spec
 spec = do
+  describe "delem" $ do
+    context "CronSchedule" $
+        it "behaves like model" $ property $
+            \(s, t) -> t `delem` s == s `scheduleMatches` t
+
   describe "dsucc" $ do
 
     context "Schedule ObservationTime" $ do
@@ -258,9 +263,12 @@ instance Arbitrary ObservationTime where
 nonNeg :: Gen (NonNegative Int)
 nonNeg = arbitrary
 
+ModifiedJulianDay day0 = fromGregorian 1800 1 1
+ModifiedJulianDay day1 = fromGregorian 3000 1 1
+
 instance Arbitrary UTCTime where
     arbitrary
-      = UTCTime <$> (ModifiedJulianDay . fromIntegral <$> nonNeg)
+      = UTCTime <$> (ModifiedJulianDay . fromIntegral <$> choose (day0,day1))
                 <*> (fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int))
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (a :> b) where
@@ -270,7 +278,9 @@ instance Arbitrary Horizons where
     arbitrary = fromList <$> listOf1 arbitrary
 
 instance Arbitrary Horizon where
-    arbitrary = Minute . fromIntegral <$> nonNeg
+    arbitrary = oneof [ Minute <$> choose (-10000,10000)
+                      , Hour   <$> choose (-1000,1000)
+                      , Day    <$> choose (-100,100)]
 
 instance Arbitrary (Schedule t) where
     arbitrary = Schedule <$> arbitrary
@@ -280,12 +290,12 @@ instance Arbitrary CronSchedule where
                              <*> arbitrary
                              <*> arbitrary
                              <*> arbitrary
-                             <*> pure (DaysOfWeek Star)
+                             <*> pure (DaysOfWeek Star) --TODO
 
 instance Arbitrary DayOfWeekSpec where
     arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)
 instance Arbitrary DayOfMonthSpec where
-    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28)
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28) -- FIXME: poner 31
 instance Arbitrary MonthSpec where
     arbitrary = Months <$> arbitraryCronField (1,12)
 instance Arbitrary MinuteSpec where
@@ -295,7 +305,7 @@ instance Arbitrary HourSpec where
 
 arbitraryCronField :: (Int,Int) -> Gen CronField
 arbitraryCronField range
-  = oneof [star,specificField,stepField]--,rangeField,listField]
+  = oneof [star,specificField,stepField,rangeField,listField]
   where
     specificField = SpecificField <$> choose range
     star          = pure Star
@@ -308,5 +318,6 @@ arbitraryCronField range
     listField     = ListField  <$>
                        listOf1 (oneof [star,specificField,rangeField
                                       ,stepField])
-    stepField     = StepField  <$> star <*> choose ( max 1 (fst range)
-                                                   , snd range)
+    stepField     = StepField  <$> oneof [star] --,rangeField]
+                               <*> choose ( max 1 (fst range)
+                                          , snd range)

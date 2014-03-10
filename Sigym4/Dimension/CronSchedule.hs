@@ -14,8 +14,7 @@ import Data.Maybe (catMaybes)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
-import Data.Time.Calendar          (toGregorian, fromGregorian
-                                   , Day(ModifiedJulianDay))
+import Data.Time.Calendar          (toGregorian, fromGregorian)
 import Data.Time.Calendar.Julian   (isJulianLeapYear)
 -- import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
@@ -29,7 +28,7 @@ instance IsString CronSchedule where
 
 instance Dimension CronSchedule where
     type DimensionIx CronSchedule = UTCTime
-    delem      = flip scheduleMatches
+    delem  t s =  timeToDimIx t `delem`  scheduleToDim s
     dpred    s = fmap dimIxToTime . dpred    (scheduleToDim s) . timeToDimIx
     dsucc    s = fmap dimIxToTime . dsucc    (scheduleToDim s) . timeToDimIx
     dfloor   s = fmap dimIxToTime . dfloor   (scheduleToDim s) . timeToDimIx
@@ -57,17 +56,21 @@ instance Dimension BCronField where
 
     -- dpred
     dpred (CF Star lo hi) m
+      | m>=hi     = Just (hi-1)
       | lo<=(m-1) = Just (m-1)
       | otherwise = Nothing
 
-    dpred (CF (SpecificField i) lo hi) m
+    dpred (CF (SpecificField i) lo _) m
       | m <= max lo i = Nothing
       | otherwise     = Just i
 
     dpred (CF (RangeField a b) lo hi) m
-      | min hi b <= m    = Just (b-1)
-      | m-1 >= max lo a  = Just (m-1)
-      | otherwise        = Nothing
+      | hi' <= m   = Just (hi'-1)
+      | m-1 >= lo' = Just (m-1)
+      | otherwise  = Nothing
+      where
+        hi' = min hi b
+        lo' = max lo a
 
     dpred (CF (StepField Star s) lo hi) m
       | m'>= lo   = Just m'
@@ -101,17 +104,21 @@ instance Dimension BCronField where
 
     -- succ
     dsucc (CF Star lo hi) m
+      | m<=lo     = Just (lo+1)
       | hi>=(m+1) = Just (m+1)
       | otherwise = Nothing
 
-    dsucc (CF (SpecificField i) lo hi) m
+    dsucc (CF (SpecificField i) _ hi) m
       | m >= min hi i = Nothing
       | otherwise     = Just i
 
     dsucc (CF (RangeField a b) lo hi) m
-      | max lo a >= m    = Just (a+1)
-      | m+1 >= min hi b  = Just (m+1)
-      | otherwise        = Nothing
+      | lo' >= m    = Just (lo'+1)
+      | m+1 <= hi'  = Just (m+1)
+      | otherwise   = Nothing
+      where
+        lo' = max lo a
+        hi' = min hi b
 
     dsucc (CF (StepField Star s) lo hi) m
       | m'<= hi   = Just m'
@@ -144,6 +151,7 @@ instance Dimension BCronField where
     
     -- dfloor
     dfloor (CF Star lo hi) m
+      | m>hi      = Just hi
       | lo<=m     = Just m
       | otherwise = Nothing
 
@@ -152,9 +160,12 @@ instance Dimension BCronField where
       | otherwise     = Just $ min hi i
 
     dfloor (CF (RangeField a b) lo hi) m
-      | min hi b <= m = Just b
-      | m >= max lo a = Just m
-      | otherwise     = Nothing
+      | hi' <= m   = Just hi'
+      | m   >= lo' = Just m
+      | otherwise  = Nothing
+      where
+        hi' = min hi b
+        lo' = max lo a
 
     dfloor (CF (StepField Star s) lo hi) m
       | m'>= lo, m'<=hi = Just m'
@@ -188,6 +199,7 @@ instance Dimension BCronField where
     
     -- dceiling
     dceiling (CF Star lo hi) m
+      | m<lo      = Just lo
       | hi>=m     = Just m
       | otherwise = Nothing
 
@@ -196,9 +208,12 @@ instance Dimension BCronField where
       | otherwise     = Just $ max lo i
 
     dceiling (CF (RangeField a b) lo hi) m
-      | max lo a >= m    = Just a
-      | m   >= min hi b  = Just m
-      | otherwise        = Nothing
+      | lo' >= m    = Just lo'
+      | m   <= hi'  = Just m
+      | otherwise   = Nothing
+      where
+        lo' = max lo a
+        hi' = min hi b
 
     dceiling (CF (StepField Star s) lo hi) m
       | m'<= hi   = Just m'
@@ -244,7 +259,7 @@ instance BoundedDimension BCronField where
 
     dlast  (CF Star                           _  hi) = const hi
     dlast  (CF (SpecificField i)              _  hi) = const $ min hi i
-    dlast  (CF (RangeField a _)               _  hi) = const $ min hi a
+    dlast  (CF (RangeField _ b)               _  hi) = const $ min hi b
     dlast  (CF (ListField fs)                 lo hi)
       = const $ maximum $ map (\f -> dfirst (CF f lo hi) undefined) fs
     dlast  (CF (StepField Star s)             _  hi) = const (hi `modFloor` s)
