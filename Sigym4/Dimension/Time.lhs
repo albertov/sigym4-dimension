@@ -19,16 +19,14 @@ Tiempos
 >   , Schedule (..)
 > ) where
 
+> import Data.List (sort, nub)
 > import Data.String (IsString(fromString))
-> import Data.Attoparsec.Text (parseOnly)
 > import Data.Time.Clock (UTCTime(..), NominalDiffTime, addUTCTime)
 > import Data.Time ()
 > import Data.Typeable (Typeable)
-> import System.Cron (CronSchedule, scheduleMatches)
-> import System.Cron.Parser (cronSchedule)
 > import GHC.Exts (IsList (..))
-> import Data.List (sort, nub)
 > import Sigym4.Dimension.Types
+> import Sigym4.Dimension.CronSchedule
 
 Preparamos el terreno para definir las dimensiones temporales creando tipos
 para los distintos tipos de tiempo, todos son envoltorios de 'UTCTime'
@@ -60,8 +58,6 @@ polimórificas.
 >     fromUTCTime :: UTCTime -> t
 >     toUTCTime   :: t ->  UTCTime
 >     addHorizon  :: Horizon -> t -> t
->     matches     :: Schedule t -> t -> Bool
->     matches (Schedule s) = (s `scheduleMatches`) . toUTCTime
 >     {-# MINIMAL fromUTCTime, toUTCTime, addHorizon #-}
 
 
@@ -115,10 +111,7 @@ una cadena en formato incorrecto. Se puede arreglar con Template Haskell
 parseando la cadena durante la compilación.
 
 > instance IsString (Schedule t) where
->     fromString s = case parseOnly cronSchedule (fromString s) of
->                      Right r -> Schedule r
->                      Left  e -> error $ "fromString(Schedule): " ++ e
-> 
+>     fromString = Schedule . fromString
 
 Definimos una instancia de 'Dimension' para 'Schedule's de
 cualquier tipo de tiempo. Ojo, es bastante ineficiente aunque en Sigym3 no es
@@ -127,18 +120,11 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 
 > instance Time t => Dimension (Schedule t) where
 >     type DimensionIx (Schedule t) = t
->     delem t  s   = s `matches` t
->     dpred    s t = Just $ next s (-1) (addHorizon (-1) t)
->     dsucc    s t = Just $ next s 1    (addHorizon 1    t)
->     dfloor   s t = Just $ next s (-1) t
->     dceiling s t = Just $ next s 1    t
-> 
-> next :: Time t => Schedule t -> Horizon -> t -> t
-> next s d = go 
->   where
->     go t | s `matches` t = t
->          | otherwise     = go (addHorizon d t)
-> 
+>     t `delem`(Schedule s) = toUTCTime t `delem` s
+>     dpred    (Schedule s) = fmap fromUTCTime . dpred s    . toUTCTime
+>     dsucc    (Schedule s) = fmap fromUTCTime . dsucc s    . toUTCTime
+>     dfloor   (Schedule s) = fmap fromUTCTime . dfloor s   . toUTCTime
+>     dceiling (Schedule s) = fmap fromUTCTime . dceiling s . toUTCTime
 
 Horizontes
 ----------

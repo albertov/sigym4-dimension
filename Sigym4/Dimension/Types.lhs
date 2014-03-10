@@ -182,8 +182,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 >     dpred (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dpred da a of
->           Just a' -> Just (a' :> b)
->           Nothing -> case dpred db b of
+>           Just a' | a'>=dfirst da b
+>                   -> Just (a' :> b)
+>           _       -> case dpred db b of
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dlast da b' :> b')
 >       | otherwise  = dfloor db b >>= \b' -> dpred (da :> db) (a :> b')
@@ -191,8 +192,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 >     dsucc (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dsucc da a of
->           Just a' -> Just (a' :> b)
->           Nothing -> case dsucc db b of
+>           Just a' | a'<=dlast da b
+>                   -> Just (a' :> b)
+>           _       -> case dsucc db b of
 >                        Nothing -> Nothing
 >                        Just b' -> Just (dfirst da b' :> b')
 >       | otherwise  = dceiling db b >>= \b' -> dsucc (da :> db) (a :> b')
@@ -200,15 +202,17 @@ iterar las dimensiones interiores para pasar a la exterior.
 >     dfloor (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dfloor da a of
->           Just a' -> dfloor db b >>= \b' -> Just (a' :> b')
->           Nothing -> dpred  db b >>= \b' -> Just (dlast da b' :> b')
+>           Just a' | a'>=dfirst da b
+>                   -> dfloor db b >>= \b' -> Just (a' :> b')
+>           _       -> dpred  db b >>= \b' -> Just (dlast da b' :> b')
 >       | otherwise  = dfloor db b >>= \b' -> Just (dlast da b' :> b')
 > 
 >     dceiling (da :> db) (a :> b)
 >       | b `delem` db
 >       = case dceiling da a of
->           Just a' -> dceiling db b >>= \b' -> Just (a' :> b')
->           Nothing -> dsucc  db b   >>= \b' -> Just (dfirst da b' :> b')
+>           Just a' | a'<=dlast da b
+>                   -> dceiling db b >>= \b' -> Just (a' :> b')
+>           _       -> dsucc    db b >>= \b' -> Just (dfirst da b' :> b')
 >       | otherwise  = dceiling db b >>= \b' -> Just (dfirst da b' :> b')
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`

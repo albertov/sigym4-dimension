@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ScopedTypeVariables, TypeOperators, FlexibleContexts #-}
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
