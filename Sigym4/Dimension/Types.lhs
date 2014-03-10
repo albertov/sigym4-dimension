@@ -213,10 +213,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
-> instance ( BoundedDimension a, BoundedDimension b
->          , DimensionIx b ~ Dependent a)
+> instance (BoundedDimension a, BoundedDimension b, Dependent a ~ DimensionIx b)
 >   => BoundedDimension (a :> b)
 >   where
->     type Dependent (a :> b) = Dependent a :> Dependent b
->     dfirst (a :> b) (ca :> cb) = dfirst a ca :> dfirst b cb
->     dlast  (a :> b) (ca :> cb) = dlast  a ca :> dlast  b cb
+>     type Dependent (a :> b) = Dependent b
+>     dfirst (a :> b) c = let fb = dfirst b c in dfirst a fb :> fb
+>     dlast  (a :> b) c = let lb = dlast  b c in dlast  a lb :> lb
