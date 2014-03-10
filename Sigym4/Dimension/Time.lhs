@@ -130,19 +130,23 @@ Horizontes
 ----------
 
 Definimos un horizonte de predicción que representa un delta de tiempo en
-distintas unidades.
+distintas unidades. También un alias para el tipo de los minutos para poder
+cambiarlo facilmente a `Integer` si algún día hay horizontes larguísismos
+para no desbordar el `Int`. Es un 10% más rápido ejecutar los tests con
+`-a 500` al usar `Int`
 
-> data Horizon = Minute !Int
->            | Hour   !Int
->            | Day    !Int
+> type Minutes = Int
+> data Horizon = Minute !Minutes
+>              | Hour   !Int
+>              | Day    !Int
 >   deriving (Show, Read, Typeable)
 
 Definimos los minutos que contiene cada tipo de horizonte para poder normalizar
 y operar con ellos.
 
-> minutes :: Horizon -> Int
-> minutes (Day d)    = d * 60 * 24
-> minutes (Hour h)   = h * 60
+> minutes :: Horizon -> Minutes
+> minutes (Day d)    = fromIntegral d * 60 * 24
+> minutes (Hour h)   = fromIntegral h * 60
 > minutes (Minute m) = m
 
 Definimos instancias para poder comparar horizontes.

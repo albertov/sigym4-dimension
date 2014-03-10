@@ -268,6 +268,7 @@ instance BoundedDimension BCronField where
     dlast  (CF f@(StepField _ _)              _  _ )
       = const $ error $ "dlast(CronField): Unimplemented " ++ show f
 
+modFloor, modCeil :: Integral a => a -> a -> a
 modFloor a m = a - (a `mod` m)
 modCeil  a m
   | md == 0   = a

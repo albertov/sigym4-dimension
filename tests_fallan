@@ -1,2 +1,2 @@
-dist/build/main/main --seed 4611685480623329750
-dist/build/main/main --seed 4611685480655217198
+dist/build/main/main -a 130 --seed 4611685480703722569
+dist/build/main/main -a 100  --seed 4611685480655217198

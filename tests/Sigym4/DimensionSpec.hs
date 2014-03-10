@@ -16,7 +16,9 @@ import GHC.Exts (fromList)
 main :: IO ()
 main = hspec spec
 
+takeSample :: [a] -> [a]
 takeSample = take 500
+
 spec :: Spec
 spec = do
   describe "delem" $ do
@@ -260,9 +262,7 @@ instance Arbitrary RunTime where
 instance Arbitrary ObservationTime where
     arbitrary = fromUTCTime <$> arbitrary
 
-nonNeg :: Gen (NonNegative Int)
-nonNeg = arbitrary
-
+day0, day1 :: Integer
 ModifiedJulianDay day0 = fromGregorian 1800 1 1
 ModifiedJulianDay day1 = fromGregorian 3000 1 1
 
