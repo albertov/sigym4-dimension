@@ -185,21 +185,21 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 > qZ :: Quantized ()
 > qZ = Quant ()
 
-> idelem :: (Dimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idelem :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> Bool
 > idelem d = delem d qZ
 >
-> idfloor, idceiling :: (Dimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idfloor, idceiling :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> Maybe (Quantized (DimensionIx d))
 > idfloor d = dfloor d qZ
 > idceiling d = dceiling d qZ
 >               
-> idpred, idsucc :: (Dimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idpred, idsucc :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> Quantized (DimensionIx d) -> Maybe (Quantized (DimensionIx d))
 > idpred d = dpred d qZ
 > idsucc d = dsucc d qZ
 >
-> idenumUp, idenumDown :: (Dimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idenumUp, idenumDown :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> [Quantized (DimensionIx d)]
 > idenumUp d = denumUp d qZ
 > idenumDown d = denumDown d qZ
@@ -229,12 +229,12 @@ inferior y superior, ambas cerradas.
 
 Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
 
-> idfirst, idlast :: (BoundedDimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idfirst, idlast :: (BoundedDimension d, DimensionIx (Dependent d) ~ ())
 >                 => d -> Quantized (DimensionIx d)
 > idfirst d = dfirst d qZ
 > idlast d  = dlast d  qZ
 >
-> idenum, idenumr :: (BoundedDimension d, Dependent d ~ t, DimensionIx t ~ ())
+> idenum, idenumr :: (BoundedDimension d, DimensionIx (Dependent d) ~ ())
 >                 => d -> [Quantized (DimensionIx d)]
 > idenum d  = denum d  qZ
 > idenumr d = denumr d qZ
