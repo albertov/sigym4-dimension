@@ -193,7 +193,7 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 >   => d -> DimensionIx d -> Maybe (Quantized (DimensionIx d))
 > idfloor d = dfloor d qZ
 > idceiling d = dceiling d qZ
->               
+
 > idpred, idsucc :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> Quantized (DimensionIx d) -> Maybe (Quantized (DimensionIx d))
 > idpred d = dpred d qZ
