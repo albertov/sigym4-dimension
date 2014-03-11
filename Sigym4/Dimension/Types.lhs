@@ -99,13 +99,13 @@ los tipos sin introducir chequeos en ejecución)
 
 > newtype Quantized a = Quant {unQuant::a}
 >   deriving (Eq, Ord, Show, Functor, Typeable)
->
+
 > justQuant :: a -> Maybe (Quantized a)
 > justQuant = Just . Quant
->
+
 > constQuant :: a -> b -> Quantized a
 > constQuant = const . Quant
->
+
 > type DDimensionIx d = Quantized (DimensionIx (Dependent d))
 
 > -- | A 'Dimension' is a possibly infinite ordered set of associated
@@ -118,14 +118,14 @@ los tipos sin introducir chequeos en ejecución)
 >   where
 >     -- | The associated type of the elements
 >     type DimensionIx d
->
+
 >     type Dependent d
->
+
 >     -- | Whether or not an element belongs to the set
 >     delem :: d
 >           -> DDimensionIx d
 >           -> DimensionIx d -> Bool
->
+
 >     -- | 'Just' the succesive element of the set. Since a
 >     --   'Dimension' can be of inifinite size it may
 >     --   never return 'Nothing'
@@ -133,7 +133,7 @@ los tipos sin introducir chequeos en ejecución)
 >           -> DDimensionIx d
 >           -> Quantized (DimensionIx d)
 >           -> Maybe (Quantized(DimensionIx d))
->
+
 >     -- | Returns 'Just' the previous element of the set. Since a
 >     --   'Dimension' can be of inifinite size it should
 >     --   never return 'Nothing'
@@ -141,23 +141,23 @@ los tipos sin introducir chequeos en ejecución)
 >           -> DDimensionIx d
 >           -> Quantized (DimensionIx d)
 >           -> Maybe (Quantized(DimensionIx d))
->
+
 >     -- | Clamps a 'DimensionIx' d which may not belong to
 >     --   the set to the closest value which is <= d, 
 >     --   'd' itself if it already belongs to the set.
 >     dfloor :: d
 >            -> DDimensionIx d
 >            -> DimensionIx d -> Maybe (Quantized(DimensionIx d))
->
+
 >     -- | Clamps a 'DimensionIx' d which possibly doesn't belong to
 >     --   the set to the closest value which is >= d, possibly
 >     --   'd' itself if it already belongs to the set.
 >     dceiling :: d
 >              -> DDimensionIx d
 >              -> DimensionIx d -> Maybe (Quantized(DimensionIx d))
->
+
 >     {-# MINIMAL delem, dsucc, dpred, dfloor, dceiling #-}
->
+
 >     -- | Similar to 'enumFrom' from 'Enum'
 >     --   A default implementation is provided in terms of 'dsucc' and 'dfloor'
 >     --   but instances may override to provide a more efficient implementation
@@ -167,7 +167,7 @@ los tipos sin introducir chequeos en ejecución)
 >     denumUp d dd a = go (dfloor d dd a)
 >       where go Nothing  = []
 >             go (Just i) = i : go (dsucc d dd i)
->
+
 >     -- | Similar to 'enumFrom' from 'Enum' but in reverse order
 >     --   A default implementation is provided in terms of 'dpred' and
 >     --   'dceiling' but instances may override to provide a more efficient
@@ -188,7 +188,7 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 > idelem :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> Bool
 > idelem d = delem d qZ
->
+
 > idfloor, idceiling :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> Maybe (Quantized (DimensionIx d))
 > idfloor d = dfloor d qZ
@@ -198,7 +198,7 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 >   => d -> Quantized (DimensionIx d) -> Maybe (Quantized (DimensionIx d))
 > idpred d = dpred d qZ
 > idsucc d = dsucc d qZ
->
+
 > idenumUp, idenumDown :: (Dimension d, DimensionIx (Dependent d) ~ ())
 >   => d -> DimensionIx d -> [Quantized (DimensionIx d)]
 > idenumUp d = denumUp d qZ
@@ -215,17 +215,17 @@ inferior y superior, ambas cerradas.
 > --   'Dimension a' must return 'Nothing' when out of bounds
 > class Dimension d => BoundedDimension d where
 >     dfirst :: d -> DDimensionIx d -> Quantized (DimensionIx d)
->
+
 >     dlast :: d -> DDimensionIx d -> Quantized (DimensionIx d)
->
+
 >     {-# MINIMAL dfirst, dlast #-}
->
+
 >     denum :: d -> DDimensionIx d -> [Quantized (DimensionIx d)]
 >     denum d dd = denumUp d dd  $ unQuant $ dfirst d dd
->
+
 >     denumr   :: d -> DDimensionIx d -> [Quantized (DimensionIx d)]
 >     denumr d dd = denumDown d dd  $ unQuant $ dlast d dd
->
+
 
 Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
 
@@ -233,7 +233,7 @@ Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
 >                 => d -> Quantized (DimensionIx d)
 > idfirst d = dfirst d qZ
 > idlast d  = dlast d  qZ
->
+
 > idenum, idenumr :: (BoundedDimension d, DimensionIx (Dependent d) ~ ())
 >                 => d -> [Quantized (DimensionIx d)]
 > idenum d  = denum d  qZ

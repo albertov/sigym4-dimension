@@ -119,10 +119,10 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 >     dsucc    (Schedule s) _ = fmap nfromUTCTime . idsucc s     . ntoUTCTime
 >     dfloor   (Schedule s) _ = fmap nfromUTCTime . idfloor s    . toUTCTime
 >     dceiling (Schedule s) _ = fmap nfromUTCTime . idceiling s  . toUTCTime
->
+
 > nfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
 > nfromUTCTime = fmap fromUTCTime
->
+
 > ntoUTCTime :: Time t => Quantized t -> Quantized UTCTime
 > ntoUTCTime = fmap toUTCTime
 
