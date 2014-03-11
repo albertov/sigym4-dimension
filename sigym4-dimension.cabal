@@ -14,11 +14,11 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:   Sigym4.Dimension
-  other-modules:     Sigym4.Dimension.Types
+                   , Sigym4.Dimension.Types
                    , Sigym4.Dimension.Time
                    , Sigym4.Dimension.CronSchedule
   -- other-extensions:    
-  build-depends:     base >=4.7 && <4.8
+  build-depends:     base >=4.7 && <5
                    , attoparsec
                    , cron
                    , time

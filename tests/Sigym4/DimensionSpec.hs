@@ -8,7 +8,6 @@ module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
 import Test.Hspec
 import Test.Hspec.QuickCheck
-import Sigym4.Dimension
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.List as L
@@ -20,6 +19,9 @@ import Test.QuickCheck
 import System.Cron
 import GHC.Exts (fromList)
 import System.Cron.Parser (cronSchedule)
+
+import Sigym4.Dimension
+import Sigym4.Dimension.Time (Schedule(Schedule))
 
 main :: IO ()
 main = hspec spec
