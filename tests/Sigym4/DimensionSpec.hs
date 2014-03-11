@@ -13,9 +13,13 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import Data.List as L
 import Data.Maybe (isJust)
+import Data.Either (isRight)
+import Data.String (fromString)
+import Data.Attoparsec.Text (parseOnly)
 import Test.QuickCheck
 import System.Cron
 import GHC.Exts (fromList)
+import System.Cron.Parser (cronSchedule)
 
 main :: IO ()
 main = hspec spec
@@ -64,7 +68,6 @@ spec = do
               Just s = dpred sched t
           unQuant s `shouldBe` datetime 2012 2 28 0 0
              
-
 
 -- | Una especificación que comprueba que se cumplen las propiedades de
 --   'Dimension' en cualquier instancia.
@@ -215,12 +218,20 @@ instance Arbitrary Horizon where
 instance Arbitrary (Schedule t) where
     arbitrary = Schedule <$> arbitrary
 
+isParseable :: CronSchedule -> Bool
+isParseable (CronSchedule a b c d e) = isRight p
+  where p = parseOnly cronSchedule $ fromString s
+        s = unwords [show a, show b, show c, show d, show e]
+
 instance Arbitrary CronSchedule where
-    arbitrary = CronSchedule <$> arbitrary
-                             <*> arbitrary
-                             <*> arbitrary
-                             <*> arbitrary
-                             <*> pure (DaysOfWeek Star) --TODO
+    arbitrary = cronschedule >>= \s -> if isValid s then return s else arbitrary
+      where
+        isValid  = isParseable
+        cronschedule = CronSchedule <$> arbitrary
+                                    <*> arbitrary
+                                    <*> arbitrary
+                                    <*> arbitrary
+                                    <*> pure (DaysOfWeek Star) --TODO
 
 instance Arbitrary DayOfWeekSpec where
     arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)

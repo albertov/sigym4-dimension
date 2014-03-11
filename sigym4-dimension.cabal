@@ -38,6 +38,7 @@ test-suite main
                    , cron
                    , hspec
                    , QuickCheck
+                   , attoparsec
                    , sigym4-dimension
   hs-source-dirs:    tests
   main-is:           Spec.hs
