@@ -10,7 +10,7 @@ module Sigym4.Dimension.CronSchedule (
 
 import Data.Attoparsec.Text (parseOnly)
 import Data.String (IsString(fromString))
-import Data.Maybe (catMaybes, fromMaybe, isJust)
+import Data.Maybe (catMaybes)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
@@ -32,8 +32,7 @@ instance Dimension CronSchedule where
     dpred    s _ = fmap ndimIxToTime . idpred (scheduleToDim s) . ntimeToDimIx
     dsucc    s _ = fmap ndimIxToTime . idsucc (scheduleToDim s) . ntimeToDimIx
     dfloor   s _ = fmap ndimIxToTime . idfloor (scheduleToDim s) . timeToDimIx
-    dceiling s _
-      = fmap ndimIxToTime . idceiling (scheduleToDim s) . timeToDimIx
+    dceiling s _ = fmap ndimIxToTime . idceiling (scheduleToDim s) . timeToDimIx
 
 data BCronField = CF CronField Int Int deriving Show
 
@@ -49,7 +48,7 @@ instance Dimension BCronField where
     delem (CF (RangeField a b) lo hi) _ m
       = max lo a <= m && min hi b >= m
     delem (CF (ListField fs) lo hi) _ m
-      = isJust $ firstContaining fs lo hi m
+      = any (\f -> idelem (CF f lo hi) m) fs
     delem (CF (StepField Star s) lo hi) _ m
       = lo<=m && m<=hi && m `mod` s == 0
     delem (CF (StepField (RangeField a b) s) lo hi) _ m
@@ -81,11 +80,12 @@ instance Dimension BCronField where
       where m'  = (m `modFloor` s) - s
             lo' = max lo a
 
-    dpred cf@(CF (ListField fs) lo hi) _ m = idpred f m
+    dpred (CF (ListField fs') lo hi) _ m = maxPred
       where
-        f = fromMaybe
-            (error $ "dpred(ListField): no matches: " ++ show cf)
-            (firstContaining fs lo hi (unQuant m))
+        fs       = filter (`idelem` (unQuant m)) [CF f' lo hi | f'<-fs']
+        maxPred  = case catMaybes $ map (`idpred` m) fs of
+                     [] -> Nothing
+                     ps -> Just . maximum $ ps
 
     dpred (CF f@(StepField _ _) _ _) _ _
       = error $ "dpred(CronField): Unimplemented " ++ show f
@@ -115,11 +115,12 @@ instance Dimension BCronField where
       where m'  = (m `modCeil` s) + s
             hi' = min hi b
 
-    dsucc cf@(CF (ListField fs) lo hi) _ m = idsucc f m
+    dsucc (CF (ListField fs') lo hi) _ m = minSucc
       where
-        f  = fromMaybe
-             (error $ "dsucc(ListField): no matches: " ++ show cf)
-             (firstContaining fs lo hi (unQuant m))
+        fs       = filter (`idelem` (unQuant m)) [CF f' lo hi | f'<-fs']
+        minSucc  = case catMaybes $ map (`idsucc` m) fs of
+                     [] -> Nothing
+                     ps -> Just . minimum $ ps
 
     dsucc (CF f@(StepField _ _) _ _) _ _
       = error $ "dsucc(CronField): Unimplemented " ++ show f
@@ -152,18 +153,12 @@ instance Dimension BCronField where
             lo' = max lo a
             hi' = min hi b
 
-    dfloor (CF (ListField fs') lo hi) _ m
-      | isEl      = idfloor f m
-      | otherwise = maxFloor
+    dfloor (CF (ListField fs') lo hi) _ m = maxFloor
       where
         fs       = [CF f' lo hi | f'<-fs']
-        isEls    = zip (map (\f' -> idelem f' m) fs) fs
-        isEl     = any fst isEls
-        f        = snd . head . dropWhile (not.fst) $ isEls
-        floors   = map (\f' -> idfloor f' m) fs
-        maxFloor = case catMaybes floors of
-                     [] -> Nothing
-                     ps -> Just . maximum .filter (<=Quant m) $ ps
+        maxFloor = case catMaybes $ map (`idfloor` m) fs of
+                    [] -> Nothing
+                    ps -> Just . maximum . filter (<= Quant m) $ ps
 
     dfloor (CF f@(StepField _ _) _ _) _ _
       = error $ "dfloor(CronField): Unimplemented " ++ show f
@@ -196,28 +191,16 @@ instance Dimension BCronField where
             lo' = max lo a
             hi' = min hi b
 
-    dceiling (CF (ListField fs') lo hi) d m
-      | isEl      = dceiling f d m
-      | otherwise = minCeil
+    dceiling (CF (ListField fs') lo hi) _ m = minCeil
       where
         fs      = [CF f' lo hi | f'<-fs']
-        isEls   = zip (map (\f' -> idelem f' m) fs) fs
-        isEl    = any fst isEls
-        f       = snd . head . dropWhile (not.fst) $ isEls
-        ceils   = map (\f' -> idceiling f' m) fs
-        minCeil = case catMaybes ceils of
+        minCeil = case catMaybes $ map (`idceiling` m) fs of
                     [] -> Nothing
-                    ps -> Just . minimum .filter (>=Quant m) $ ps
+                    ps -> Just . minimum . filter (>= Quant m) $ ps
 
     dceiling (CF f@(StepField _ _) _ _) _ _
       = error $ "dceiling(CronField): Unimplemented " ++ show f
 
-firstContaining :: [CronField]
-                -> Int -> Int -> Int -> Maybe BCronField
-firstContaining fs lo hi m
-  = case dropWhile (not . \f -> idelem f m) [CF f lo hi | f<-fs] of
-           (f':_) -> Just f'
-           _      -> Nothing
 
 instance BoundedDimension BCronField where
     dfirst (CF Star                           lo _ ) = constQuant lo

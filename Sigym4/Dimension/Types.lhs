@@ -298,19 +298,19 @@ iterar las dimensiones interiores para pasar a la exterior.
 > 
 >     dpred (da :> db) c (Quant (a :> b))
 >       = case dpred da (Quant b) (Quant a) of
->           Just (Quant a') | Quant a'>=dfirst da (Quant b)
+>           Just (Quant a')
 >                   -> justQuant (a' :> b)
->           _       -> case dpred db c (Quant b) of
+>           Nothing -> case dpred db c (Quant b) of
 >                        Nothing         -> Nothing
 >                        Just (Quant b') -> let Quant l = dlast da (Quant b')
 >                                           in justQuant (l :> b')
 > 
 >     dsucc (da :> db) c (Quant (a :> b))
 >       = case dsucc da (Quant b) (Quant a) of
->           Just (Quant a') | Quant a' <= dlast da (Quant b)
+>           Just (Quant a')
 >                   -> justQuant (a' :> b)
->           _       -> case dsucc db c (Quant b) of
->                        Nothing        -> Nothing
+>           Nothing -> case dsucc db c (Quant b) of
+>                        Nothing         -> Nothing
 >                        Just (Quant b') -> let Quant f = dfirst da (Quant b')
 >                                           in justQuant (f :> b')
 > 
@@ -318,9 +318,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 >       | delem db c b
 >       = let bq = Quant b
 >         in case dfloor da bq a of
->           Just (Quant a') | Quant a'>= dfirst da bq
+>           Just (Quant a')
 >                   -> dfloor db c b  >>= \(Quant b') -> justQuant (a' :> b')
->           _       -> dpred  db c bq >>= \(Quant b') ->
+>           Nothing -> dpred  db c bq >>= \(Quant b') ->
 >                                          let Quant l = dlast da (Quant b')
 >                                          in justQuant (l :> b')
 >       | otherwise  = dfloor db c b  >>= \(Quant b') ->
@@ -331,9 +331,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 >       | delem db c b
 >       = let bq = Quant b
 >         in case dceiling da bq a of
->           Just (Quant a') | Quant a' <= dlast da bq
+>           Just (Quant a')
 >                   -> dceiling db c b  >>= \(Quant b') -> justQuant (a' :> b')
->           _       -> dsucc    db c bq >>= \(Quant b') ->
+>           Nothing -> dsucc    db c bq >>= \(Quant b') ->
 >                                            let Quant f = dfirst da (Quant b')
 >                                            in justQuant (f :> b')
 >       | otherwise  = dceiling db c b  >>= \(Quant b') ->
