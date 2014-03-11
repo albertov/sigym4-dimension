@@ -262,13 +262,15 @@ instance Arbitrary RunTime where
 instance Arbitrary ObservationTime where
     arbitrary = fromUTCTime <$> arbitrary
 
-day0, day1 :: Integer
-ModifiedJulianDay day0 = fromGregorian 1800 1 1
-ModifiedJulianDay day1 = fromGregorian 3000 1 1
+instance Arbitrary Day where
+    arbitrary = ModifiedJulianDay . fromIntegral <$> choose (day0, day1)
+      where
+        ModifiedJulianDay day0 = fromGregorian 0 1 1
+        ModifiedJulianDay day1 = fromGregorian 5000 1 1
 
 instance Arbitrary UTCTime where
     arbitrary
-      = UTCTime <$> (ModifiedJulianDay . fromIntegral <$> choose (day0,day1))
+      = UTCTime <$> arbitrary
                 <*> (fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int))
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (a :> b) where
@@ -316,8 +318,10 @@ arbitraryCronField range
         then return $ RangeField lo hi
         else rangeField
     listField     = ListField  <$>
-                       listOf1 (oneof [star,specificField,rangeField
-                                      ,stepField])
-    stepField     = StepField  <$> oneof [star] --,rangeField]
+                       listOf1 (oneof [ star
+                                      , specificField
+                                      , rangeField
+                                      , stepField])
+    stepField     = StepField  <$> oneof [star]--,rangeField]
                                <*> choose ( max 1 (fst range)
                                           , snd range)

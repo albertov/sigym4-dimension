@@ -14,8 +14,7 @@ import Data.Maybe (catMaybes)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
-import Data.Time.Calendar          (toGregorian, fromGregorian)
-import Data.Time.Calendar.Julian   (isJulianLeapYear)
+import Data.Time.Calendar          (toGregorian, fromGregorian, isLeapYear)
 -- import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
 
@@ -74,13 +73,14 @@ instance Dimension BCronField where
 
     dpred (CF (StepField Star s) lo hi) m
       | m'>= lo   = Just m'
-      | m >= hi   = Just $ hi - s
+      | m'>= hi   = Just $ hi - s
       | otherwise = Nothing
       where m' = (m `modFloor` s) - s
 
     dpred (CF (StepField (RangeField a b) s) lo hi) m
-      | lo'<=m' && m'<=hi' = Just m'
-      | otherwise          = Nothing
+      | m'>= lo'   = Just m'
+      | m'>= hi'   = Just $ hi' - s
+      | otherwise  = Nothing
       where m'  = (m `modFloor` s) - s
             lo' = max lo a
             hi' = min hi b
@@ -127,8 +127,9 @@ instance Dimension BCronField where
       where m' = (m `modCeil` s) + s
 
     dsucc (CF (StepField (RangeField a b) s) lo hi) m
-      | lo'<=m' && m'<=hi' = Just m'
-      | otherwise          = Nothing
+      | m'<= hi'   = Just m'
+      | m'<= lo'   = Just $ lo' + s
+      | otherwise  = Nothing
       where m'  = (m `modCeil` s) + s
             lo' = max lo a
             hi' = min hi b
@@ -216,14 +217,15 @@ instance Dimension BCronField where
         hi' = min hi b
 
     dceiling (CF (StepField Star s) lo hi) m
-      | m'<= hi   = Just m'
-      | m' <lo   = Just lo
+      | m'<=lo    = Just lo
+      | m'<=hi    = Just m'
       | otherwise = Nothing
       where m' = m `modCeil` s
 
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
-      | lo'<=m' && m'<=hi' = Just m'
-      | otherwise          = Nothing
+      | m'<=lo'   = Just lo
+      | m'<=hi'   = Just m'
+      | otherwise = Nothing
       where m'  = m `modCeil` s
             lo' = max lo a
             hi' = min hi b
@@ -318,11 +320,11 @@ instance BoundedDimension DayOfMonthSpec where
 
 daysPerMonth :: Int -> Int -> Int
 daysPerMonth yr mth
-  | mth == 2, isLeapYear yr       = 29
+  | mth == 2, isLeapYear' yr       = 29
   | mth == 2                      = 28
   | mth `elem` [4,6,9,11]         = 30
   | otherwise                     = 31
-  where isLeapYear = isJulianLeapYear . fromIntegral
+  where isLeapYear' = isLeapYear . fromIntegral
 
 instance Dimension MonthSpec where
     type DimensionIx MonthSpec = Int

@@ -67,17 +67,17 @@ cualquier dirección.
 >     -- | 'Just' the succesive element of the set. Since a
 >     --   'Dimension' can be of inifinite size it may
 >     --   never return 'Nothing'
->     dsucc    :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dsucc :: d -> DimensionIx d -> Maybe (DimensionIx d)
 >
 >     -- | Returns 'Just' the previous element of the set. Since a
 >     --   'Dimension' can be of inifinite size it should
 >     --   never return 'Nothing'
->     dpred    :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dpred :: d -> DimensionIx d -> Maybe (DimensionIx d)
 >
 >     -- | Clamps a 'DimensionIx' d which may not belong to
 >     --   the set to the closest value which is <= d, 
 >     --   'd' itself if it already belongs to the set.
->     dfloor   :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dfloor :: d -> DimensionIx d -> Maybe (DimensionIx d)
 >
 >     -- | Clamps a 'DimensionIx' d which possibly doesn't belong to
 >     --   the set to the closest value which is >= d, possibly
