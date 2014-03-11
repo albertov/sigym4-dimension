@@ -113,7 +113,8 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 
 > instance Time t => Dimension (Schedule t) where
 >     type DimensionIx (Schedule t) = t
->     t `delem`(Schedule s) = toUTCTime t `delem` s
+>     type Dependent   (Schedule t) = ()
+>     delem    (Schedule s) = delem s . toUTCTime
 >     dpred    (Schedule s) = fmap nfromUTCTime . dpred s    . ntoUTCTime
 >     dsucc    (Schedule s) = fmap nfromUTCTime . dsucc s    . ntoUTCTime
 >     dfloor   (Schedule s) = fmap nfromUTCTime . dfloor s   . toUTCTime
@@ -227,7 +228,8 @@ finita (`BoundedDimension`).
  
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
->     delem d (Horizons ds) = d `elem` ds
+>     type Dependent   Horizons = Schedule RunTime
+>     delem (Horizons ds) = (`elem` ds)
 >     dpred (Horizons ds) (Quant d)
 >       = case dropWhile (>= d) (reverse ds) of
 >           []    -> Nothing
@@ -246,7 +248,6 @@ finita (`BoundedDimension`).
 >           (x:_) -> justQuant x
 > 
 > instance BoundedDimension Horizons where
->     type Dependent Horizons = Schedule RunTime
 >     dfirst (Horizons ds) = constQuant $ head ds
 >     dlast  (Horizons ds) = constQuant $ last ds
 >     denum  (Horizons ds) = const (map Quant ds)

@@ -110,8 +110,10 @@ los tipos sin introducir chequeos en ejecución)
 >     -- | The associated type of the elements
 >     type DimensionIx d
 >
+>     type Dependent d
+>
 >     -- | Whether or not an element belongs to the set
->     delem :: DimensionIx d -> d -> Bool
+>     delem :: d -> DimensionIx d -> Bool
 >
 >     -- | 'Just' the succesive element of the set. Since a
 >     --   'Dimension' can be of inifinite size it may
@@ -167,13 +169,18 @@ inferior y superior, ambas cerradas.
 > -- | A 'BoundedDimension' is a finite 'Dimension'
 > --   The implementation of 'dsucc', 'dpred', 'dceiling' and 'dfloor' from
 > --   'Dimension a' must return 'Nothing' when out of bounds
-> class (Dimension d, Dimension (Dependent d)) => BoundedDimension d where
->     type Dependent d
+> class Dimension d => BoundedDimension d where
 >     dfirst   :: d -> DDimensionIx d -> Quantized (DimensionIx d)
->     dlast    :: d -> DDimensionIx d -> Quantized(DimensionIx d)
+>
+>     dlast    :: d -> DDimensionIx d -> Quantized (DimensionIx d)
+>
 >     {-# MINIMAL dfirst, dlast #-}
->     denum    :: d -> DDimensionIx d -> [Quantized(DimensionIx d)]
->     denum d = denumUp d . unQuant . dfirst d
+>
+>     denum    :: d -> DDimensionIx d -> [Quantized (DimensionIx d)]
+>     denum  d = denumUp d   . unQuant . dfirst d
+>
+>     denumr   :: d -> DDimensionIx d -> [Quantized (DimensionIx d)]
+>     denumr d = denumDown d . unQuant . dlast  d
 >
 > type DDimensionIx d = Quantized (DimensionIx (Dependent d))
 
@@ -184,6 +191,7 @@ indexar datos estáticos.
 
 > instance Dimension () where
 >     type DimensionIx () = ()
+>     type Dependent   () = ()
 >     delem () ()  = True
 >     dpred    _ _ = Nothing
 >     dsucc    _ _ = Nothing
@@ -191,7 +199,6 @@ indexar datos estáticos.
 >     dceiling _ _ = justQuant ()
 > 
 > instance BoundedDimension () where
->     type Dependent () = ()
 >     dfirst _ _  = Quant ()
 >     dlast  _ _  = Quant ()
 > 
@@ -231,8 +238,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 > instance (BoundedDimension a, Dimension b, Dependent a ~ b)
 >   => Dimension (a :> b) where
 >     type DimensionIx (a :> b) = DimensionIx a :> DimensionIx b
+>     type Dependent (a :> b)   = Dependent b
 > 
->     delem (a :> b) (da :> db) = a `delem` da && b `delem` db
+>     delem (da :> db) (a :> b) = delem da a && delem db b
 > 
 >     dpred (da :> db) (Quant (a :> b))
 >       = case dpred da (Quant a) of
@@ -253,7 +261,7 @@ iterar las dimensiones interiores para pasar a la exterior.
 >                                          in justQuant (f :> b')
 > 
 >     dfloor (da :> db) (a :> b)
->       | b `delem` db
+>       | delem db b
 >       = let bn = Quant b
 >         in case dfloor da a of
 >           Just (Quant a') | Quant a'>= dfirst da bn
@@ -266,7 +274,7 @@ iterar las dimensiones interiores para pasar a la exterior.
 >                                        in justQuant (l :> b')
 > 
 >     dceiling (da :> db) (a :> b)
->       | b `delem` db
+>       | delem db b
 >       = let bn = Quant b
 >         in case dceiling da a of
 >           Just (Quant a') | Quant a' <= dlast da bn
@@ -283,7 +291,6 @@ El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 > instance (BoundedDimension a, BoundedDimension b, b ~ Dependent a)
 >   => BoundedDimension (a :> b)
 >   where
->     type Dependent (a :> b) = Dependent b
 >     dfirst (a :> b) c = let Quant fb = dfirst b c
 >                             Quant fa = dfirst a (Quant fb)
 >                         in Quant (fa :> fb)

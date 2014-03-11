@@ -42,7 +42,7 @@ spec = do
   context "CronSchedule" $ do
     describe "delem" $ do
       it "behaves like model" $ property $
-        \(s, t) -> t `delem` s == s `scheduleMatches` t
+        \(s, t) -> s `delem` t == s `scheduleMatches` t
 
     describe "leap years" $ do
 
@@ -94,7 +94,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "dfloor" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((`delem` d) . unQuant) (dfloor d i) == Just True
+            fmap ((delem d) . unQuant) (dfloor d i) == Just True
 
     it "returns an element smaller or EQ" $ property $
         \((d::dim), i) ->
@@ -119,7 +119,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "dceiling" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((`delem` d) . unQuant) (dceiling d i) == Just True
+            fmap ((delem d) . unQuant) (dceiling d i) == Just True
 
     it "returns an element greater or EQ" $ property $
         \((d::dim), i) ->
@@ -145,7 +145,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((`delem` d) . unQuant) $ takeSample $ denumUp d i
+            all ((delem d) . unQuant) $ takeSample $ denumUp d i
 
     it "returns sorted elements" $ property $
         \((d::dim), i) ->
@@ -162,7 +162,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((`delem` d) . unQuant) $ takeSample $ denumDown d i
+            all ((delem d) . unQuant) $ takeSample $ denumDown d i
 
     it "returns reversely sorted elements" $ property $
         \((d::dim), i) ->

@@ -27,7 +27,8 @@ instance IsString CronSchedule where
 
 instance Dimension CronSchedule where
     type DimensionIx CronSchedule = UTCTime
-    delem  t s =  timeToDimIx t `delem`  scheduleToDim s
+    type Dependent   CronSchedule = ()
+    delem    s = delem (scheduleToDim s) . timeToDimIx
     dpred    s = fmap ndimIxToTime . dpred    (scheduleToDim s) . ntimeToDimIx
     dsucc    s = fmap ndimIxToTime . dsucc    (scheduleToDim s) . ntimeToDimIx
     dfloor   s = fmap ndimIxToTime . dfloor   (scheduleToDim s) . timeToDimIx
@@ -37,21 +38,22 @@ data BCronField = CF CronField Int Int deriving Show
 
 instance Dimension BCronField where
     type DimensionIx BCronField = Int
+    type Dependent BCronField = ()
 
     -- delem
-    delem m (CF Star lo hi)
+    delem (CF Star lo hi) m
       = lo<=m && m<=hi
-    delem m (CF (SpecificField i) _ _)
+    delem (CF (SpecificField i) _ _) m
       = m==i
-    delem m (CF (RangeField a b) lo hi)
+    delem (CF (RangeField a b) lo hi) m
       = max lo a <= m && min hi b >= m
-    delem m (CF (ListField fs) lo hi)
+    delem (CF (ListField fs) lo hi) m
       = isJust $ firstContaining fs lo hi m
-    delem m (CF (StepField Star s) lo hi)
+    delem (CF (StepField Star s) lo hi) m
       = lo<=m && m<=hi && m `mod` s == 0
-    delem m (CF (StepField (RangeField a b) s) lo hi)
+    delem (CF (StepField (RangeField a b) s) lo hi) m
       = max lo a <= m && min hi b >= m && m `mod` s == 0
-    delem _ (CF f@(StepField _ _) _ _)
+    delem (CF f@(StepField _ _) _ _) _
       = error $ "delem(BCronField): Unimplemented " ++ show f
 
     -- dpred
@@ -154,7 +156,7 @@ instance Dimension BCronField where
       | otherwise = maxFloor
       where
         fs       = [CF f' lo hi | f'<-fs']
-        isEls    = zip (map (delem m) fs) fs
+        isEls    = zip (map (\f -> delem f m) fs) fs
         isEl     = any fst isEls
         f        = snd . head . dropWhile (not.fst) $ isEls
         floors   = map (`dfloor` m) fs
@@ -198,7 +200,7 @@ instance Dimension BCronField where
       | otherwise = minCeil
       where
         fs      = [CF f' lo hi | f'<-fs']
-        isEls   = zip (map (delem m) fs) fs
+        isEls   = zip (map (\f -> delem f m) fs) fs
         isEl    = any fst isEls
         f       = snd . head . dropWhile (not.fst) $ isEls
         ceils   = map (`dceiling` m) fs
@@ -212,12 +214,11 @@ instance Dimension BCronField where
 firstContaining :: [CronField]
                 -> Int -> Int -> Int -> Maybe BCronField
 firstContaining fs lo hi m
-  = case dropWhile (not . delem m) [CF f lo hi | f<-fs] of
+  = case dropWhile (not . \f -> delem f m) [CF f lo hi | f<-fs] of
            (f':_) -> Just f'
            _      -> Nothing
 
 instance BoundedDimension BCronField where
-    type Dependent BCronField = ()
     dfirst (CF Star                           lo _ ) = constQuant lo
     dfirst (CF (SpecificField i)              lo _ ) = constQuant $ max lo i
     dfirst (CF (RangeField a _)               lo _ ) = constQuant $ max lo a
@@ -253,40 +254,40 @@ modCeil  a m
 
 instance Dimension MinuteSpec where
     type DimensionIx MinuteSpec = Int
-    delem i  (Minutes cs) = i `delem` (CF cs 0 59)
+    type Dependent   MinuteSpec = HourSpec
+    delem    (Minutes cs) = delem     (CF cs 0 59)
     dpred    (Minutes cs) = dpred     (CF cs 0 59)
     dsucc    (Minutes cs) = dsucc     (CF cs 0 59)
     dfloor   (Minutes cs) = dfloor    (CF cs 0 59)
     dceiling (Minutes cs) = dceiling  (CF cs 0 59)
 
 instance BoundedDimension MinuteSpec where
-    type Dependent MinuteSpec = HourSpec
     dfirst (Minutes cs) _ = dfirst (CF cs 0 59) qZ
     dlast  (Minutes cs) _ = dlast  (CF cs 0 59) qZ
 
 instance Dimension HourSpec where
     type DimensionIx HourSpec = Int
-    delem i  (Hours cs) = i `delem` (CF cs 0 23)
+    type Dependent   HourSpec = DayOfMonthSpec
+    delem    (Hours cs) = delem     (CF cs 0 23)
     dpred    (Hours cs) = dpred     (CF cs 0 23)
     dsucc    (Hours cs) = dsucc     (CF cs 0 23)
     dfloor   (Hours cs) = dfloor    (CF cs 0 23)
     dceiling (Hours cs) = dceiling  (CF cs 0 23)
 
 instance BoundedDimension HourSpec where
-    type Dependent HourSpec = DayOfMonthSpec
     dfirst (Hours cs) _ = dfirst (CF cs 0 23) qZ
     dlast  (Hours cs) _ = dlast  (CF cs 0 23) qZ
 
 instance Dimension DayOfMonthSpec where
     type DimensionIx DayOfMonthSpec = Int
-    delem i  (DaysOfMonth cs) = i `delem` (CF cs 1 31)
+    type Dependent   DayOfMonthSpec = MonthSpec :> Years
+    delem    (DaysOfMonth cs) = delem     (CF cs 1 31)
     dpred    (DaysOfMonth cs) = dpred     (CF cs 1 31)
     dsucc    (DaysOfMonth cs) = dsucc     (CF cs 1 31)
     dfloor   (DaysOfMonth cs) = dfloor    (CF cs 1 31)
     dceiling (DaysOfMonth cs) = dceiling  (CF cs 1 31)
 
 instance BoundedDimension DayOfMonthSpec where
-    type Dependent DayOfMonthSpec = MonthSpec :> Years
     dfirst (DaysOfMonth cs) (Quant (mth :> yr)) = dfirst (CF cs 1 dpm) qZ
       where dpm = daysPerMonth yr mth
     dlast  (DaysOfMonth cs) (Quant (mth :> yr)) = dlast  (CF cs 1 dpm) qZ
@@ -302,19 +303,20 @@ daysPerMonth yr mth
 
 instance Dimension MonthSpec where
     type DimensionIx MonthSpec = Int
-    delem i  (Months cs) = i `delem` (CF cs 1 12)
+    type Dependent   MonthSpec = Years
+    delem    (Months cs) = delem     (CF cs 1 12)
     dpred    (Months cs) = dpred     (CF cs 1 12)
     dsucc    (Months cs) = dsucc     (CF cs 1 12)
     dfloor   (Months cs) = dfloor    (CF cs 1 12)
     dceiling (Months cs) = dceiling  (CF cs 1 12)
 
 instance BoundedDimension MonthSpec where
-    type Dependent MonthSpec = Years
     dfirst (Months cs) _  = dfirst (CF cs  1 12) qZ
     dlast  (Months cs) _  = dlast  (CF cs  1 12) qZ
 
 instance Dimension Years where
     type DimensionIx Years = Int
+    type Dependent   Years = ()
     delem    _ _         = True
     dpred    _ (Quant i) = justQuant (i-1)
     dsucc    _ (Quant i) = justQuant (i+1)
