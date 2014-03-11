@@ -114,11 +114,11 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 > instance Time t => Dimension (Schedule t) where
 >     type DimensionIx (Schedule t) = t
 >     type Dependent   (Schedule t) = ()
->     delem    (Schedule s) = delem s . toUTCTime
->     dpred    (Schedule s) = fmap nfromUTCTime . dpred s    . ntoUTCTime
->     dsucc    (Schedule s) = fmap nfromUTCTime . dsucc s    . ntoUTCTime
->     dfloor   (Schedule s) = fmap nfromUTCTime . dfloor s   . toUTCTime
->     dceiling (Schedule s) = fmap nfromUTCTime . dceiling s . toUTCTime
+>     delem    (Schedule s) _ = idelem s . toUTCTime
+>     dpred    (Schedule s) _ = fmap nfromUTCTime . idpred s     . ntoUTCTime
+>     dsucc    (Schedule s) _ = fmap nfromUTCTime . idsucc s     . ntoUTCTime
+>     dfloor   (Schedule s) _ = fmap nfromUTCTime . idfloor s    . toUTCTime
+>     dceiling (Schedule s) _ = fmap nfromUTCTime . idceiling s  . toUTCTime
 >
 > nfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
 > nfromUTCTime = fmap fromUTCTime
@@ -229,20 +229,20 @@ finita (`BoundedDimension`).
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
 >     type Dependent   Horizons = Schedule RunTime
->     delem (Horizons ds) = (`elem` ds)
->     dpred (Horizons ds) (Quant d)
+>     delem (Horizons ds) _ = (`elem` ds)
+>     dpred (Horizons ds) _ (Quant d)
 >       = case dropWhile (>= d) (reverse ds) of
 >           []    -> Nothing
 >           (x:_) -> justQuant x
->     dsucc (Horizons ds) (Quant d)
+>     dsucc (Horizons ds) _ (Quant d)
 >       = case dropWhile (<= d) ds of
 >           []    -> Nothing
 >           (x:_) -> justQuant x
->     dfloor (Horizons ds) d
+>     dfloor (Horizons ds) _ d
 >       = case dropWhile (> d) (reverse ds) of
 >           []    -> Nothing
 >           (x:_) -> justQuant x
->     dceiling (Horizons ds) d
+>     dceiling (Horizons ds) _ d
 >       = case dropWhile (< d) ds of
 >           []    -> Nothing
 >           (x:_) -> justQuant x

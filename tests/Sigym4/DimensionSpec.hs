@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings
            , ScopedTypeVariables
            , TypeOperators
+           , TypeFamilies
            , FlexibleContexts
            #-}
 module Sigym4.DimensionSpec (main, spec) where
@@ -40,72 +41,73 @@ spec = do
 
 
   context "CronSchedule" $ do
-    describe "delem" $ do
+    describe "idelem" $ do
       it "behaves like model" $ property $
-        \(s, t) -> s `delem` t == s `scheduleMatches` t
+        \(s, t) -> s `idelem` t == s `scheduleMatches` t
 
     describe "leap years" $ do
 
-      describe "dsucc" $ do
+      describe "idsucc" $ do
         it "returns day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
-              Just t = dfloor sched (datetime 2012 2 28 0 0)
-              Just s = dsucc sched t
+              Just t = idfloor sched (datetime 2012 2 28 0 0)
+              Just s = idsucc sched t
           unQuant s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
-              Just t = dfloor sched (datetime 2012 2 29 0 0)
-              Just s = dsucc sched t
+              Just t = idfloor sched (datetime 2012 2 29 0 0)
+              Just s = idsucc sched t
           unQuant s `shouldBe` datetime 2012 3 1 0 0
 
-      describe "dpred" $ do
+      describe "idpred" $ do
         it "returns day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
-              Just t = dfloor sched (datetime 2012 3 1 0 0)
-              Just s = dpred sched t
+              Just t = idfloor sched (datetime 2012 3 1 0 0)
+              Just s = idpred sched t
           unQuant s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
-              Just t = dfloor sched (datetime 2012 2 29 0 0)
-              Just s = dpred sched t
+              Just t = idfloor sched (datetime 2012 2 29 0 0)
+              Just s = idpred sched t
           unQuant s `shouldBe` datetime 2012 2 28 0 0
              
 
 -- | Una especificación que comprueba que se cumplen las propiedades de
 --   'Dimension' en cualquier instancia.
 dimensionSpec :: forall dim.
-  (Arbitrary dim, Arbitrary (DimensionIx dim), Dimension dim)
+  ( Arbitrary dim, Arbitrary (DimensionIx dim), Dimension dim
+  , DimensionIx (Dependent dim) ~ ())
   => String -> Proxy dim -> Spec
 dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
-  describe "dsucc" $ do
+  describe "idsucc" $ do
     it "returns an element strictly greater" $ property $
         \((d::dim), i) ->
-        let norm   = dfloor d i
+        let norm   = idfloor d i
             Just v = norm
-        in isJust norm ==> fmap (`compare` v) (dsucc d v) == Just GT
+        in isJust norm ==> fmap (`compare` v) (idsucc d v) == Just GT
 
-  describe "dpred" $ do
+  describe "idpred" $ do
     it "returns an element strictly smaller" $ property $
         \((d::dim), i) ->
-        let norm   = dfloor d i
+        let norm   = idfloor d i
             Just v = norm
-        in isJust norm ==> fmap (`compare` v) (dpred d v) == Just LT
+        in isJust norm ==> fmap (`compare` v) (idpred d v) == Just LT
 
-  describe "dfloor" $ do
+  describe "idfloor" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((delem d) . unQuant) (dfloor d i) == Just True
+            fmap ((idelem d) . unQuant) (idfloor d i) == Just True
 
     it "returns an element smaller or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQuant) (dfloor d i)
+            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQuant) (idfloor d i)
               == Just True
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
-          let fa'     = dfloor d a
-              fb'     = dfloor d b
-              fc'     = dfloor d c
+          let fa'     = idfloor d a
+              fb'     = idfloor d b
+              fc'     = idfloor d c
               Just fa = fa'
               Just fb = fb'
               Just fc = fc'
@@ -116,21 +118,21 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
               &&
             ((fa `compare` fc) `elem` [EQ, LT])
 
-  describe "dceiling" $ do
+  describe "idceiling" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((delem d) . unQuant) (dceiling d i) == Just True
+            fmap ((idelem d) . unQuant) (idceiling d i) == Just True
 
     it "returns an element greater or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQuant) (dceiling d i)
+            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQuant) (idceiling d i)
               == Just True
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
-          let fa'     = dceiling d a
-              fb'     = dceiling d b
-              fc'     = dceiling d c
+          let fa'     = idceiling d a
+              fb'     = idceiling d b
+              fc'     = idceiling d c
               Just fa = fa'
               Just fb = fb'
               Just fc = fc'
@@ -141,37 +143,37 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
               &&
             ((fa `compare` fc) `elem` [EQ, GT])
 
-  describe "denumUp" $ do
+  describe "idenumUp" $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((delem d) . unQuant) $ takeSample $ denumUp d i
+            all ((idelem d) . unQuant) $ takeSample $ idenumUp d i
 
     it "returns sorted elements" $ property $
         \((d::dim), i) ->
-            let elems = takeSample $ denumUp d i
+            let elems = takeSample $ idenumUp d i
             in L.sort elems == elems
 
     it "does not return duplicate elements" $ property $
         \((d::dim), i) ->
-            let elems = takeSample $ denumUp d i
+            let elems = takeSample $ idenumUp d i
             in L.nub elems == elems
 
 
-  describe "denumDown" $ do
+  describe "idenumDown" $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((delem d) . unQuant) $ takeSample $ denumDown d i
+            all ((idelem d) . unQuant) $ takeSample $ idenumDown d i
 
     it "returns reversely sorted elements" $ property $
         \((d::dim), i) ->
-            let elems = takeSample $ denumDown d i
+            let elems = takeSample $ idenumDown d i
             in L.sort elems == reverse elems
 
     it "does not return duplicate elements" $ property $
         \((d::dim), i) ->
-            let elems = takeSample $ denumUp d i
+            let elems = takeSample $ idenumUp d i
             in L.nub elems == elems
 
 
