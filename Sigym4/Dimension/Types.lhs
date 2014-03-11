@@ -167,14 +167,15 @@ inferior y superior, ambas cerradas.
 > -- | A 'BoundedDimension' is a finite 'Dimension'
 > --   The implementation of 'dsucc', 'dpred', 'dceiling' and 'dfloor' from
 > --   'Dimension a' must return 'Nothing' when out of bounds
-> class Dimension d => BoundedDimension d where
+> class (Dimension d, Dimension (Dependent d)) => BoundedDimension d where
 >     type Dependent d
->     dfirst   :: d -> Quantized(Dependent d) -> Quantized(DimensionIx d)
->     dlast    :: d -> Quantized(Dependent d) -> Quantized(DimensionIx d)
+>     dfirst   :: d -> DDimensionIx d -> Quantized (DimensionIx d)
+>     dlast    :: d -> DDimensionIx d -> Quantized(DimensionIx d)
 >     {-# MINIMAL dfirst, dlast #-}
->     denum    :: d -> Quantized(Dependent d) -> [Quantized(DimensionIx d)]
->     denum d d2 = denumUp d f
->       where Quant f = dfirst d d2
+>     denum    :: d -> DDimensionIx d -> [Quantized(DimensionIx d)]
+>     denum d = denumUp d . unQuant . dfirst d
+>
+> type DDimensionIx d = Quantized (DimensionIx (Dependent d))
 
 
 Comenzamos definiendo algunas instancias de Dimensiones típicas, la primera
@@ -227,7 +228,7 @@ sistema de tipos requiriendo `BoundedDimension` en la variable de tipo `a`.
 iterar las dimensiones interiores para pasar a la exterior.
 
 
-> instance (BoundedDimension a, Dimension b, DimensionIx b ~ Dependent a)
+> instance (BoundedDimension a, Dimension b, Dependent a ~ b)
 >   => Dimension (a :> b) where
 >     type DimensionIx (a :> b) = DimensionIx a :> DimensionIx b
 > 
@@ -279,7 +280,7 @@ iterar las dimensiones interiores para pasar a la exterior.
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
-> instance (BoundedDimension a, BoundedDimension b, Dependent a ~ DimensionIx b)
+> instance (BoundedDimension a, BoundedDimension b, b ~ Dependent a)
 >   => BoundedDimension (a :> b)
 >   where
 >     type Dependent (a :> b) = Dependent b

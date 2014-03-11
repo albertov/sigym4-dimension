@@ -246,7 +246,7 @@ finita (`BoundedDimension`).
 >           (x:_) -> justQuant x
 > 
 > instance BoundedDimension Horizons where
->     type Dependent Horizons = RunTime
+>     type Dependent Horizons = Schedule RunTime
 >     dfirst (Horizons ds) = constQuant $ head ds
 >     dlast  (Horizons ds) = constQuant $ last ds
 >     denum  (Horizons ds) = const (map Quant ds)

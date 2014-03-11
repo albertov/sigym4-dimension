@@ -260,7 +260,7 @@ instance Dimension MinuteSpec where
     dceiling (Minutes cs) = dceiling  (CF cs 0 59)
 
 instance BoundedDimension MinuteSpec where
-    type Dependent MinuteSpec = Int
+    type Dependent MinuteSpec = HourSpec
     dfirst (Minutes cs) _ = dfirst (CF cs 0 59) qZ
     dlast  (Minutes cs) _ = dlast  (CF cs 0 59) qZ
 
@@ -273,7 +273,7 @@ instance Dimension HourSpec where
     dceiling (Hours cs) = dceiling  (CF cs 0 23)
 
 instance BoundedDimension HourSpec where
-    type Dependent HourSpec = Int
+    type Dependent HourSpec = DayOfMonthSpec
     dfirst (Hours cs) _ = dfirst (CF cs 0 23) qZ
     dlast  (Hours cs) _ = dlast  (CF cs 0 23) qZ
 
@@ -286,7 +286,7 @@ instance Dimension DayOfMonthSpec where
     dceiling (DaysOfMonth cs) = dceiling  (CF cs 1 31)
 
 instance BoundedDimension DayOfMonthSpec where
-    type Dependent DayOfMonthSpec = Int :> Int
+    type Dependent DayOfMonthSpec = MonthSpec :> Years
     dfirst (DaysOfMonth cs) (Quant (mth :> yr)) = dfirst (CF cs 1 dpm) qZ
       where dpm = daysPerMonth yr mth
     dlast  (DaysOfMonth cs) (Quant (mth :> yr)) = dlast  (CF cs 1 dpm) qZ
@@ -309,7 +309,7 @@ instance Dimension MonthSpec where
     dceiling (Months cs) = dceiling  (CF cs 1 12)
 
 instance BoundedDimension MonthSpec where
-    type Dependent MonthSpec = Int
+    type Dependent MonthSpec = Years
     dfirst (Months cs) _  = dfirst (CF cs  1 12) qZ
     dlast  (Months cs) _  = dlast  (CF cs  1 12) qZ
 
@@ -320,13 +320,6 @@ instance Dimension Years where
     dsucc    _ (Quant i) = justQuant (i+1)
     dfloor   _ a         = justQuant a
     dceiling _ a         = justQuant a
-
-{-
-instance BoundedDimension Years where
-    type Dependent Years = ()
-    dfirst (Years a _) _ = a
-    dlast  (Years _ b) _ = b
--}
 
 type TimeIx = DimensionIx CronScheduleDim
 type CronScheduleDim = MinuteSpec
