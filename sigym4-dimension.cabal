@@ -29,6 +29,7 @@ library
                      -fwarn-incomplete-patterns
                      -fwarn-incomplete-uni-patterns
                      -funbox-strict-fields
+                     -O2
 
 test-suite main
   type:              exitcode-stdio-1.0

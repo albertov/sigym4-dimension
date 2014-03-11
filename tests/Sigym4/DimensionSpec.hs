@@ -1,5 +1,9 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE ScopedTypeVariables, TypeOperators, FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings
+           , ScopedTypeVariables
+           , TypeOperators
+           , FlexibleContexts
+           #-}
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
 import Test.Hspec
@@ -21,234 +25,158 @@ takeSample = take 500
 
 spec :: Spec
 spec = do
-  describe "delem" $ do
-    context "CronSchedule" $
-        it "behaves like model" $ property $
-            \(s, t) -> t `delem` s == s `scheduleMatches` t
 
+  dimensionSpec "Schedule ObservationTime"
+                (Proxy :: Proxy (Schedule ObservationTime))
+
+  dimensionSpec "Horizons :> Schedule RunTime"
+                (Proxy :: Proxy (Horizons :> Schedule RunTime))
+
+
+  context "CronSchedule" $ do
+    describe "delem" $ do
+      it "behaves like model" $ property $
+        \(s, t) -> t `delem` s == s `scheduleMatches` t
+
+    describe "leap years" $ do
+
+      describe "dsucc" $ do
+        it "returns day 29" $ do
+          let sched  = "0 0 * * *" :: CronSchedule
+              Just t = dfloor sched (datetime 2012 2 28 0 0)
+              Just s = dsucc sched t
+          unQuant s `shouldBe` datetime 2012 2 29 0 0
+        it "accepts day 29" $ do
+          let sched  = "0 0 * * *" :: CronSchedule
+              Just t = dfloor sched (datetime 2012 2 29 0 0)
+              Just s = dsucc sched t
+          unQuant s `shouldBe` datetime 2012 3 1 0 0
+
+      describe "dpred" $ do
+        it "returns day 29" $ do
+          let sched  = "0 0 * * *" :: CronSchedule
+              Just t = dfloor sched (datetime 2012 3 1 0 0)
+              Just s = dpred sched t
+          unQuant s `shouldBe` datetime 2012 2 29 0 0
+        it "accepts day 29" $ do
+          let sched  = "0 0 * * *" :: CronSchedule
+              Just t = dfloor sched (datetime 2012 2 29 0 0)
+              Just s = dpred sched t
+          unQuant s `shouldBe` datetime 2012 2 28 0 0
+             
+
+
+-- | Una especificación que comprueba que se cumplen las propiedades de
+--   'Dimension' en cualquier instancia.
+dimensionSpec :: forall dim.
+  (Arbitrary dim, Arbitrary (DimensionIx dim), Dimension dim)
+  => String -> Proxy dim -> Spec
+dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "dsucc" $ do
-
-    context "Schedule ObservationTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`delem` d) (dsucc d i) == Just True
-
-        it "returns an element strictly greater" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`compare` i) (dsucc d i) == Just GT
-
-    context "Horizons :> Schedule RunTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`delem` d) (dsucc d i) == Just True
-
-        it "returns an element strictly greater" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`compare` i) (dsucc d i) == Just GT
+    it "returns an element strictly greater" $ property $
+        \((d::dim), i) ->
+        let norm   = dfloor d i
+            Just v = norm
+        in isJust norm ==> fmap (`compare` v) (dsucc d v) == Just GT
 
   describe "dpred" $ do
-
-    context "Schedule ObservationTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`delem` d) (dpred d i) == Just True
-
-        it "returns an element strictly smaller" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`compare` i) (dpred d i) == Just LT
-
-    context "Horizons :> Schedule RunTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`delem` d) (dpred d i) == Just True
-
-        it "returns an element strictly smaller" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`compare` i) (dpred d i) == Just LT
-
+    it "returns an element strictly smaller" $ property $
+        \((d::dim), i) ->
+        let norm   = dfloor d i
+            Just v = norm
+        in isJust norm ==> fmap (`compare` v) (dpred d v) == Just LT
 
   describe "dfloor" $ do
+    it "returns an element belonging to set" $ property $
+        \((d::dim), i) ->
+            fmap ((`delem` d) . unQuant) (dfloor d i) == Just True
 
-    context "Schedule ObservationTime" $ do
+    it "returns an element smaller or EQ" $ property $
+        \((d::dim), i) ->
+            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQuant) (dfloor d i)
+              == Just True
 
-        it "returns an element belonging to set" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`delem` d) (dfloor d i) == Just True
-
-        it "returns an element smaller or EQ" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap ((`elem` [LT,EQ]) . (`compare` i)) (dfloor d i)
-                  == Just True
-
-        it "application preserves ordering" $ property $
-            \((d::Schedule ObservationTime), (a,b,c)) ->
-              let fa'     = dfloor d a
-                  fb'     = dfloor d b
-                  fc'     = dfloor d c
-                  Just fa = fa'
-                  Just fb = fb'
-                  Just fc = fc'
-              in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
-                ((fa `compare` fb) `elem` [EQ, LT])
-                  &&
-                ((fb `compare` fc) `elem` [EQ, LT])
-                  &&
-                ((fa `compare` fc) `elem` [EQ, LT])
-
-
-    context "Horizons :> Schedule RunTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`delem` d) (dfloor d i) == Just True
-
-        it "returns an element smaller or EQ" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap ((`elem` [LT,EQ]) . (`compare` i)) (dfloor d i)
-                  == Just True
-
-        it "application preserves ordering" $ property $
-            \((d :: Horizons :> Schedule RunTime), (a,b,c)) ->
-              let fa'     = dfloor d a
-                  fb'     = dfloor d b
-                  fc'     = dfloor d c
-                  Just fa = fa'
-                  Just fb = fb'
-                  Just fc = fc'
-              in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
-                ((fa `compare` fb) `elem` [EQ, LT])
-                  &&
-                ((fb `compare` fc) `elem` [EQ, LT])
-                  &&
-                ((fa `compare` fc) `elem` [EQ, LT])
+    it "application preserves ordering" $ property $
+        \((d::dim), (a,b,c)) ->
+          let fa'     = dfloor d a
+              fb'     = dfloor d b
+              fc'     = dfloor d c
+              Just fa = fa'
+              Just fb = fb'
+              Just fc = fc'
+          in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
+            ((fa `compare` fb) `elem` [EQ, LT])
+              &&
+            ((fb `compare` fc) `elem` [EQ, LT])
+              &&
+            ((fa `compare` fc) `elem` [EQ, LT])
 
   describe "dceiling" $ do
+    it "returns an element belonging to set" $ property $
+        \((d::dim), i) ->
+            fmap ((`delem` d) . unQuant) (dceiling d i) == Just True
 
-    context "Schedule ObservationTime" $ do
+    it "returns an element greater or EQ" $ property $
+        \((d::dim), i) ->
+            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQuant) (dceiling d i)
+              == Just True
 
-        it "returns an element belonging to set" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap (`delem` d) (dceiling d i) == Just True
-
-        it "returns an element greater or EQ" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                fmap ((`elem` [GT,EQ]) . (`compare` i)) (dceiling d i)
-                  == Just True
-
-        it "application preserves ordering" $ property $
-            \((d::Schedule ObservationTime), (a,b,c)) ->
-              let fa'     = dceiling d a
-                  fb'     = dceiling d b
-                  fc'     = dceiling d c
-                  Just fa = fa'
-                  Just fb = fb'
-                  Just fc = fc'
-              in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
-                ((fa `compare` fb) `elem` [EQ, GT])
-                  &&
-                ((fb `compare` fc) `elem` [EQ, GT])
-                  &&
-                ((fa `compare` fc) `elem` [EQ, GT])
-
-
-    context "Horizons :> Schedule RunTime" $ do
-
-        it "returns an element belonging to set" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap (`delem` d) (dceiling d i) == Just True
-
-        it "returns an element greater or EQ" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                fmap ((`elem` [GT,EQ]) . (`compare` i)) (dceiling d i)
-                  == Just True
-
-        it "application preserves ordering" $ property $
-            \((d :: Horizons :> Schedule RunTime), (a,b,c)) ->
-              let fa'     = dceiling d a
-                  fb'     = dceiling d b
-                  fc'     = dceiling d c
-                  Just fa = fa'
-                  Just fb = fb'
-                  Just fc = fc'
-              in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
-                ((fa `compare` fb) `elem` [EQ, GT])
-                  &&
-                ((fb `compare` fc) `elem` [EQ, GT])
-                  &&
-                ((fa `compare` fc) `elem` [EQ, GT])
-
+    it "application preserves ordering" $ property $
+        \((d::dim), (a,b,c)) ->
+          let fa'     = dceiling d a
+              fb'     = dceiling d b
+              fc'     = dceiling d c
+              Just fa = fa'
+              Just fb = fb'
+              Just fc = fc'
+          in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
+            ((fa `compare` fb) `elem` [EQ, GT])
+              &&
+            ((fb `compare` fc) `elem` [EQ, GT])
+              &&
+            ((fa `compare` fc) `elem` [EQ, GT])
 
   describe "denumUp" $ do
 
-    context "Schedule ObservationTime" $ do
+    it "returns only elements of dimension" $ property $
+        \((d::dim), i) ->
+            all ((`delem` d) . unQuant) $ takeSample $ denumUp d i
 
-        it "returns only elements of dimension" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                all (`delem` d) $ takeSample $ denumUp d i
+    it "returns sorted elements" $ property $
+        \((d::dim), i) ->
+            let elems = takeSample $ denumUp d i
+            in L.sort elems == elems
 
-        it "returns sorted elements" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.sort elems == elems
+    it "does not return duplicate elements" $ property $
+        \((d::dim), i) ->
+            let elems = takeSample $ denumUp d i
+            in L.nub elems == elems
 
-        it "does not return duplicate elements" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.nub elems == elems
-
-    context "Horizons :> Schedule RunTime" $ do
-
-        it "returns only elements of product dimension" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                all (`delem` d) $ takeSample $ denumUp d i
-
-        it "returns sorted elements" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.sort elems == elems
-
-        it "does not return duplicate elements" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.nub elems == elems
 
   describe "denumDown" $ do
 
-    context "Schedule ObservationTime" $ do
+    it "returns only elements of dimension" $ property $
+        \((d::dim), i) ->
+            all ((`delem` d) . unQuant) $ takeSample $ denumDown d i
 
-        it "returns only elements of dimension" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                all (`delem` d) $ takeSample $ denumDown d i
+    it "returns reversely sorted elements" $ property $
+        \((d::dim), i) ->
+            let elems = takeSample $ denumDown d i
+            in L.sort elems == reverse elems
 
-        it "returns reversely sorted elements" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                let elems = takeSample $ denumDown d i
-                in L.sort elems == reverse elems
+    it "does not return duplicate elements" $ property $
+        \((d::dim), i) ->
+            let elems = takeSample $ denumUp d i
+            in L.nub elems == elems
 
-        it "does not return duplicate elements" $ property $
-            \((d::Schedule ObservationTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.nub elems == elems
 
-    context "Horizons :> Schedule RunTime" $ do
+-- Utilidades
 
-        it "returns only elements of product dimension" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                all (`delem` d) $ takeSample $ denumDown d i
+datetime :: Int -> Int -> Int -> Int -> Int -> UTCTime
+datetime y m d h mn
+  = UTCTime (fromGregorian (fromIntegral y) m d) (fromIntegral (h*60+mn)*60)
 
-        it "returns reversely sorted elements" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = takeSample $ denumDown d i
-                in L.sort elems == reverse elems
-
-        it "does not return duplicate elements" $ property $
-            \((d :: Horizons :> Schedule RunTime), i) ->
-                let elems = takeSample $ denumUp d i
-                in L.nub elems == elems
+data Proxy a = Proxy
 
 
 -- A continuación se implementan instancias de Arbitrary de varios tipos
@@ -297,7 +225,7 @@ instance Arbitrary CronSchedule where
 instance Arbitrary DayOfWeekSpec where
     arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)
 instance Arbitrary DayOfMonthSpec where
-    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28) -- FIXME: poner 31
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28)
 instance Arbitrary MonthSpec where
     arbitrary = Months <$> arbitraryCronField (1,12)
 instance Arbitrary MinuteSpec where

@@ -10,7 +10,7 @@ module Sigym4.Dimension.CronSchedule (
 
 import Data.Attoparsec.Text (parseOnly)
 import Data.String (IsString(fromString))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
@@ -28,10 +28,10 @@ instance IsString CronSchedule where
 instance Dimension CronSchedule where
     type DimensionIx CronSchedule = UTCTime
     delem  t s =  timeToDimIx t `delem`  scheduleToDim s
-    dpred    s = fmap dimIxToTime . dpred    (scheduleToDim s) . timeToDimIx
-    dsucc    s = fmap dimIxToTime . dsucc    (scheduleToDim s) . timeToDimIx
-    dfloor   s = fmap dimIxToTime . dfloor   (scheduleToDim s) . timeToDimIx
-    dceiling s = fmap dimIxToTime . dceiling (scheduleToDim s) . timeToDimIx
+    dpred    s = fmap ndimIxToTime . dpred    (scheduleToDim s) . ntimeToDimIx
+    dsucc    s = fmap ndimIxToTime . dsucc    (scheduleToDim s) . ntimeToDimIx
+    dfloor   s = fmap ndimIxToTime . dfloor   (scheduleToDim s) . timeToDimIx
+    dceiling s = fmap ndimIxToTime . dceiling (scheduleToDim s) . timeToDimIx
 
 data BCronField = CF CronField Int Int deriving Show
 
@@ -39,145 +39,112 @@ instance Dimension BCronField where
     type DimensionIx BCronField = Int
 
     -- delem
-    delem m (CF Star               lo hi)               = lo<=m && m<=hi
-    delem m (CF (SpecificField i)  _  _ )               = m==i
-    delem m (CF (RangeField a b)   lo hi)               = max lo a <= m 
-                                                       && min hi b >= m
-    delem m (CF (ListField fs)     lo hi)               = any (delem m)
-                                                          [CF f lo hi | f<-fs]
-    delem m (CF (StepField Star s) lo hi)               = lo<=m && m<=hi
-                                                       && m `mod` s == 0
-    delem m (CF (StepField (RangeField a b) s) lo hi)   = max lo a <= m
-                                                       && min hi b >= m
-                                                       && m `mod` s == 0
+    delem m (CF Star lo hi)
+      = lo<=m && m<=hi
+    delem m (CF (SpecificField i) _ _)
+      = m==i
+    delem m (CF (RangeField a b) lo hi)
+      = max lo a <= m && min hi b >= m
+    delem m (CF (ListField fs) lo hi)
+      = isJust $ firstContaining fs lo hi m
+    delem m (CF (StepField Star s) lo hi)
+      = lo<=m && m<=hi && m `mod` s == 0
+    delem m (CF (StepField (RangeField a b) s) lo hi)
+      = max lo a <= m && min hi b >= m && m `mod` s == 0
     delem _ (CF f@(StepField _ _) _ _)
       = error $ "delem(BCronField): Unimplemented " ++ show f
 
     -- dpred
-    dpred (CF Star lo hi) m
-      | m>=hi     = Just (hi-1)
-      | lo<=(m-1) = Just (m-1)
+    dpred (CF Star lo _) (Quant m)
+      | lo<=(m-1) = justQuant (m-1)
       | otherwise = Nothing
 
-    dpred (CF (SpecificField i) lo _) m
-      | m <= max lo i = Nothing
-      | otherwise     = Just i
+    dpred (CF (SpecificField _) _ _) _ = Nothing
 
-    dpred (CF (RangeField a b) lo hi) m
-      | hi' <= m   = Just (hi'-1)
-      | m-1 >= lo' = Just (m-1)
+    dpred (CF (RangeField a _) lo _) (Quant m)
+      | m-1 >= lo' = justQuant (m-1)
       | otherwise  = Nothing
       where
-        hi' = min hi b
         lo' = max lo a
 
-    dpred (CF (StepField Star s) lo hi) m
-      | m'>= lo   = Just m'
-      | m'>= hi   = Just $ hi - s
+    dpred (CF (StepField Star s) lo _) (Quant m)
+      | m'>= lo   = justQuant m'
       | otherwise = Nothing
       where m' = (m `modFloor` s) - s
 
-    dpred (CF (StepField (RangeField a b) s) lo hi) m
-      | m'>= lo'   = Just m'
-      | m'>= hi'   = Just $ hi' - s
+    dpred (CF (StepField (RangeField a _) s) lo _) (Quant m)
+      | m'>= lo'   = justQuant m'
       | otherwise  = Nothing
       where m'  = (m `modFloor` s) - s
             lo' = max lo a
-            hi' = min hi b
 
-    dpred (CF (ListField fs') lo hi) m
-      | isEl = dpred f m
-      | otherwise = maxPred
+    dpred cf@(CF (ListField fs) lo hi) m = dpred f m
       where
-        fs      = [CF f' lo hi | f'<-fs']
-        isEls   = zip (map (delem m) fs) fs
-        isEl    = any fst isEls
-        f       = snd . head . dropWhile (not.fst) $ isEls
-        preds   = map (`dpred` m) fs
-        maxPred = case catMaybes preds of
-                    [] -> Nothing
-                    ps -> Just . maximum .filter (<m) $ ps
+        f = fromMaybe
+            (error $ "dpred(ListField): no matches: " ++ show cf)
+            (firstContaining fs lo hi (unQuant m))
 
     dpred (CF f@(StepField _ _) _ _) _
       = error $ "dpred(CronField): Unimplemented " ++ show f
 
 
     -- succ
-    dsucc (CF Star lo hi) m
-      | m<=lo     = Just (lo+1)
-      | hi>=(m+1) = Just (m+1)
+    dsucc (CF Star _ hi) (Quant m)
+      | hi>=(m+1) = justQuant (m+1)
       | otherwise = Nothing
 
-    dsucc (CF (SpecificField i) _ hi) m
-      | m >= min hi i = Nothing
-      | otherwise     = Just i
+    dsucc (CF (SpecificField _) _ _) _ = Nothing
 
-    dsucc (CF (RangeField a b) lo hi) m
-      | lo' >= m    = Just (lo'+1)
-      | m+1 <= hi'  = Just (m+1)
+    dsucc (CF (RangeField _ b) _ hi) (Quant m)
+      | m+1 <= hi'  = justQuant (m+1)
       | otherwise   = Nothing
       where
-        lo' = max lo a
         hi' = min hi b
 
-    dsucc (CF (StepField Star s) lo hi) m
-      | m'<= hi   = Just m'
-      | m'<= lo   = Just $ lo + s
+    dsucc (CF (StepField Star s) _ hi) (Quant m)
+      | m'<= hi   = justQuant m'
       | otherwise = Nothing
       where m' = (m `modCeil` s) + s
 
-    dsucc (CF (StepField (RangeField a b) s) lo hi) m
-      | m'<= hi'   = Just m'
-      | m'<= lo'   = Just $ lo' + s
+    dsucc (CF (StepField (RangeField _ b) s) _ hi) (Quant m)
+      | m'<= hi'   = justQuant m'
       | otherwise  = Nothing
       where m'  = (m `modCeil` s) + s
-            lo' = max lo a
             hi' = min hi b
 
-    dsucc (CF (ListField fs') lo hi) m
-      | isEl      = dsucc f m
-      | otherwise = minSucc
+    dsucc cf@(CF (ListField fs) lo hi) m = dsucc f m
       where
-        fs      = [CF f' lo hi | f'<-fs']
-        isEls   = zip (map (delem m) fs) fs
-        isEl    = any fst isEls
-        f       = snd . head . dropWhile (not.fst) $ isEls
-        succs   = map (`dsucc` m) fs
-        minSucc = case catMaybes succs of
-                    [] -> Nothing
-                    ps -> Just . minimum .filter (>m) $ ps
+        f  = fromMaybe
+             (error $ "dsucc(ListField): no matches: " ++ show cf)
+             (firstContaining fs lo hi (unQuant m))
 
     dsucc (CF f@(StepField _ _) _ _) _
       = error $ "dsucc(CronField): Unimplemented " ++ show f
     
     -- dfloor
     dfloor (CF Star lo hi) m
-      | m>hi      = Just hi
-      | lo<=m     = Just m
+      | m>=lo     = justQuant $ min hi m
       | otherwise = Nothing
 
     dfloor (CF (SpecificField i) lo hi) m
-      | m <  max lo i = Nothing
-      | otherwise     = Just $ min hi i
+      | m >= max lo i = justQuant $ min hi i
+      | otherwise     = Nothing
 
     dfloor (CF (RangeField a b) lo hi) m
-      | hi' <= m   = Just hi'
-      | m   >= lo' = Just m
+      | m   >= lo' = justQuant $ min hi' m
       | otherwise  = Nothing
       where
         hi' = min hi b
         lo' = max lo a
 
     dfloor (CF (StepField Star s) lo hi) m
-      | m'>= lo, m'<=hi = Just m'
-      | m' >hi          = Just hi
-      | otherwise       = Nothing
+      | m'>= lo   = justQuant $ min hi m'
+      | otherwise = Nothing
       where m' = m `modFloor` s
 
     dfloor (CF (StepField (RangeField a b) s) lo hi) m
-      | lo'<=m' && m'<=hi' = Just m'
-      | m' >hi'            = Just hi'
-      | otherwise          = Nothing
+      | m'>= lo'  = justQuant $ min hi' m'
+      | otherwise = Nothing
       where m' = m `modFloor` s
             lo' = max lo a
             hi' = min hi b
@@ -190,41 +157,37 @@ instance Dimension BCronField where
         isEls    = zip (map (delem m) fs) fs
         isEl     = any fst isEls
         f        = snd . head . dropWhile (not.fst) $ isEls
-        floors   = map (`dpred` m) fs
+        floors   = map (`dfloor` m) fs
         maxFloor = case catMaybes floors of
                      [] -> Nothing
-                     ps -> Just . maximum .filter (<=m) $ ps
+                     ps -> Just . maximum .filter (<=Quant m) $ ps
 
     dfloor (CF f@(StepField _ _) _ _) _
       = error $ "dfloor(CronField): Unimplemented " ++ show f
     
     -- dceiling
     dceiling (CF Star lo hi) m
-      | m<lo      = Just lo
-      | hi>=m     = Just m
+      | m<=hi     = justQuant $ max lo m
       | otherwise = Nothing
 
     dceiling (CF (SpecificField i) lo hi) m
-      | m >  min hi i = Nothing
-      | otherwise     = Just $ max lo i
+      | m<=min hi i = justQuant $ max lo i
+      | otherwise   = Nothing
 
     dceiling (CF (RangeField a b) lo hi) m
-      | lo' >= m    = Just lo'
-      | m   <= hi'  = Just m
-      | otherwise   = Nothing
+      | m<=hi'    = justQuant $ max lo' m
+      | otherwise = Nothing
       where
         lo' = max lo a
         hi' = min hi b
 
     dceiling (CF (StepField Star s) lo hi) m
-      | m'<=lo    = Just lo
-      | m'<=hi    = Just m'
+      | m'<=hi    = justQuant $ max lo m'
       | otherwise = Nothing
       where m' = m `modCeil` s
 
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
-      | m'<=lo'   = Just lo
-      | m'<=hi'   = Just m'
+      | m'<=hi'   = justQuant $ max lo' m'
       | otherwise = Nothing
       where m'  = m `modCeil` s
             lo' = max lo a
@@ -241,32 +204,43 @@ instance Dimension BCronField where
         ceils   = map (`dceiling` m) fs
         minCeil = case catMaybes ceils of
                     [] -> Nothing
-                    ps -> Just . minimum .filter (>=m) $ ps
+                    ps -> Just . minimum .filter (>=Quant m) $ ps
 
     dceiling (CF f@(StepField _ _) _ _) _
       = error $ "dceiling(CronField): Unimplemented " ++ show f
 
+firstContaining :: [CronField]
+                -> Int -> Int -> Int -> Maybe BCronField
+firstContaining fs lo hi m
+  = case dropWhile (not . delem m) [CF f lo hi | f<-fs] of
+           (f':_) -> Just f'
+           _      -> Nothing
+
 instance BoundedDimension BCronField where
     type Dependent BCronField = ()
-    dfirst (CF Star                           lo _ ) = const lo
-    dfirst (CF (SpecificField i)              lo _ ) = const $ max lo i
-    dfirst (CF (RangeField a _)               lo _ ) = const $ max lo a
+    dfirst (CF Star                           lo _ ) = constQuant lo
+    dfirst (CF (SpecificField i)              lo _ ) = constQuant $ max lo i
+    dfirst (CF (RangeField a _)               lo _ ) = constQuant $ max lo a
     dfirst (CF (ListField fs)                 lo hi)
       = const $ minimum $ map (\f -> dfirst (CF f lo hi) undefined) fs
-    dfirst (CF (StepField Star s)             lo _ ) = const (lo `modCeil` s)
-    dfirst (CF (StepField (RangeField a _) s) lo _ ) = const (lo' `modCeil` s)
-        where lo' = max lo a
+    dfirst (CF (StepField Star s)             lo _ )
+      = constQuant (lo `modCeil` s)
+    dfirst (CF (StepField (RangeField a _) s) lo _ )
+      = constQuant (lo' `modCeil` s)
+      where lo' = max lo a
     dfirst (CF f@(StepField _ _)              _  _ )
       = const $ error $ "dfirst(CronField): Unimplemented " ++ show f
 
-    dlast  (CF Star                           _  hi) = const hi
-    dlast  (CF (SpecificField i)              _  hi) = const $ min hi i
-    dlast  (CF (RangeField _ b)               _  hi) = const $ min hi b
+    dlast  (CF Star                           _  hi) = constQuant hi
+    dlast  (CF (SpecificField i)              _  hi) = constQuant $ min hi i
+    dlast  (CF (RangeField _ b)               _  hi) = constQuant $ min hi b
     dlast  (CF (ListField fs)                 lo hi)
       = const $ maximum $ map (\f -> dfirst (CF f lo hi) undefined) fs
-    dlast  (CF (StepField Star s)             _  hi) = const (hi `modFloor` s)
-    dlast  (CF (StepField (RangeField _ b) s) _  hi) = const (hi' `modFloor` s)
-        where hi' = min hi b
+    dlast  (CF (StepField Star s)             _  hi)
+      = constQuant (hi `modFloor` s)
+    dlast  (CF (StepField (RangeField _ b) s) _  hi)
+      = constQuant (hi' `modFloor` s)
+      where hi' = min hi b
     dlast  (CF f@(StepField _ _)              _  _ )
       = const $ error $ "dlast(CronField): Unimplemented " ++ show f
 
@@ -287,8 +261,8 @@ instance Dimension MinuteSpec where
 
 instance BoundedDimension MinuteSpec where
     type Dependent MinuteSpec = Int
-    dfirst (Minutes cs) _ = dfirst (CF cs 0 59) ()
-    dlast  (Minutes cs) _ = dlast  (CF cs 0 59) ()
+    dfirst (Minutes cs) _ = dfirst (CF cs 0 59) qZ
+    dlast  (Minutes cs) _ = dlast  (CF cs 0 59) qZ
 
 instance Dimension HourSpec where
     type DimensionIx HourSpec = Int
@@ -300,8 +274,8 @@ instance Dimension HourSpec where
 
 instance BoundedDimension HourSpec where
     type Dependent HourSpec = Int
-    dfirst (Hours cs) _ = dfirst (CF cs 0 23) ()
-    dlast  (Hours cs) _ = dlast  (CF cs 0 23) ()
+    dfirst (Hours cs) _ = dfirst (CF cs 0 23) qZ
+    dlast  (Hours cs) _ = dlast  (CF cs 0 23) qZ
 
 instance Dimension DayOfMonthSpec where
     type DimensionIx DayOfMonthSpec = Int
@@ -313,14 +287,14 @@ instance Dimension DayOfMonthSpec where
 
 instance BoundedDimension DayOfMonthSpec where
     type Dependent DayOfMonthSpec = Int :> Int
-    dfirst (DaysOfMonth cs) (mth :> yr) = dfirst (CF cs 1 dpm) ()
+    dfirst (DaysOfMonth cs) (Quant (mth :> yr)) = dfirst (CF cs 1 dpm) qZ
       where dpm = daysPerMonth yr mth
-    dlast  (DaysOfMonth cs) (mth :> yr) = dlast  (CF cs 1 dpm) ()
+    dlast  (DaysOfMonth cs) (Quant (mth :> yr)) = dlast  (CF cs 1 dpm) qZ
       where dpm = daysPerMonth yr mth
 
 daysPerMonth :: Int -> Int -> Int
 daysPerMonth yr mth
-  | mth == 2, isLeapYear' yr       = 29
+  | mth == 2, isLeapYear' yr      = 29
   | mth == 2                      = 28
   | mth `elem` [4,6,9,11]         = 30
   | otherwise                     = 31
@@ -336,16 +310,16 @@ instance Dimension MonthSpec where
 
 instance BoundedDimension MonthSpec where
     type Dependent MonthSpec = Int
-    dfirst (Months cs) _  = dfirst (CF cs  1 12) ()
-    dlast  (Months cs) _  = dlast  (CF cs  1 12) ()
+    dfirst (Months cs) _  = dfirst (CF cs  1 12) qZ
+    dlast  (Months cs) _  = dlast  (CF cs  1 12) qZ
 
 instance Dimension Years where
     type DimensionIx Years = Int
-    delem    _ _ = True
-    dpred    _ i = Just (i-1)
-    dsucc    _ i = Just (i+1)
-    dfloor   _ i = Just i
-    dceiling _ i = Just i
+    delem    _ _         = True
+    dpred    _ (Quant i) = justQuant (i-1)
+    dsucc    _ (Quant i) = justQuant (i+1)
+    dfloor   _ a         = justQuant a
+    dceiling _ a         = justQuant a
 
 {-
 instance BoundedDimension Years where
@@ -359,12 +333,18 @@ type CronScheduleDim = MinuteSpec
                     :> HourSpec
                     :> DayOfMonthSpec 
                     :> (MonthSpec :> Years)
-data Years = Years
+data Years = Years deriving Show
+
+ndimIxToTime :: Quantized TimeIx -> Quantized UTCTime
+ndimIxToTime = fmap dimIxToTime
 
 dimIxToTime :: TimeIx -> UTCTime
 dimIxToTime (mins :> hours :> dom :> (month :> year))
   = UTCTime (fromGregorian (fromIntegral year) month dom)
             (fromIntegral $ (hours*60+mins) * 60)
+
+ntimeToDimIx :: Quantized UTCTime -> Quantized TimeIx
+ntimeToDimIx = fmap timeToDimIx
 
 timeToDimIx :: UTCTime -> TimeIx
 timeToDimIx UTCTime {utctDay = uDay, utctDayTime = uTime }

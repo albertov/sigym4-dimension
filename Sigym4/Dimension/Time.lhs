@@ -60,19 +60,12 @@ polimórificas.
 >     addHorizon  :: Horizon -> t -> t
 >     {-# MINIMAL fromUTCTime, toUTCTime, addHorizon #-}
 
-
-
 Hacemos los tipos de tiempo miembros de la clase 'Time' de manera
 simétrica para cada tipo.
 
 Notese que el tiempo se trunca al minuto más cercano limitando la resolución
-temporal efectiva del sistema a 1 minuto.
-Esta limitación se debe a que la implementación de la instancia de `Dimension`
-para los `Time` que itera en incrementos fijos para encontrar los elementos
-contiguos al dado en `dpred`, `dsucc`, `dfloor` y `dceiling`. Este incremento
-tiene que se <= resolución temporal mínima y sería muy ineficiente hacerlo en
-incrementos más finos. Innecesario también, ya que la la implementación de
-`Schedule` es similar a cron que tampoco permite intervalos más finos.
+temporal efectiva del sistema a 1 minuto. Esta limitación se debe a que
+la implementación de `Schedule` que no genera intervalos más finos.
 En Sigym3 no ha dado problemas tener resolución de minuto, de hecho, la más fina
 es cincominutal. 
 
@@ -121,19 +114,26 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 > instance Time t => Dimension (Schedule t) where
 >     type DimensionIx (Schedule t) = t
 >     t `delem`(Schedule s) = toUTCTime t `delem` s
->     dpred    (Schedule s) = fmap fromUTCTime . dpred s    . toUTCTime
->     dsucc    (Schedule s) = fmap fromUTCTime . dsucc s    . toUTCTime
->     dfloor   (Schedule s) = fmap fromUTCTime . dfloor s   . toUTCTime
->     dceiling (Schedule s) = fmap fromUTCTime . dceiling s . toUTCTime
+>     dpred    (Schedule s) = fmap nfromUTCTime . dpred s    . ntoUTCTime
+>     dsucc    (Schedule s) = fmap nfromUTCTime . dsucc s    . ntoUTCTime
+>     dfloor   (Schedule s) = fmap nfromUTCTime . dfloor s   . toUTCTime
+>     dceiling (Schedule s) = fmap nfromUTCTime . dceiling s . toUTCTime
+>
+> nfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
+> nfromUTCTime = fmap fromUTCTime
+>
+> ntoUTCTime :: Time t => Quantized t -> Quantized UTCTime
+> ntoUTCTime = fmap toUTCTime
 
 Horizontes
 ----------
 
 Definimos un horizonte de predicción que representa un delta de tiempo en
-distintas unidades. También un alias para el tipo de los minutos para poder
-cambiarlo facilmente a `Integer` si algún día hay horizontes larguísismos
-para no desbordar el `Int`. Es un 10% más rápido ejecutar los tests con
-`-a 500` al usar `Int`
+distintas unidades interoperables.
+
+También un alias para el tipo de los minutos para poder cambiarlo facilmente a
+`Integer` si algún día hay horizontes larguísismos que desbordan el `Int`.
+Es un 10% más rápido ejecutar los tests con `-a 500` al usar `Int`
 
 > type Minutes = Int
 > data Horizon = Minute !Minutes
@@ -164,7 +164,7 @@ Definimos instancias para poder comparar horizontes.
 >     a        `compare` b        = minutes a `compare` minutes b
 
 Definimos instancia de 'Num' para los horizontes para poder operar
-como ellos como si fuesen números y para poder escribirlos como números. 
+como ellos como si fuesen números y para poder escribir constantes como números.
 
 > instance Num Horizon where
 >     Minute a + Minute b = Minute (a         + b        )
@@ -228,25 +228,25 @@ finita (`BoundedDimension`).
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
 >     delem d (Horizons ds) = d `elem` ds
->     dpred (Horizons ds) d
+>     dpred (Horizons ds) (Quant d)
 >       = case dropWhile (>= d) (reverse ds) of
 >           []    -> Nothing
->           (x:_) -> Just x
->     dsucc (Horizons ds) d
+>           (x:_) -> justQuant x
+>     dsucc (Horizons ds) (Quant d)
 >       = case dropWhile (<= d) ds of
 >           []    -> Nothing
->           (x:_) -> Just x
+>           (x:_) -> justQuant x
 >     dfloor (Horizons ds) d
 >       = case dropWhile (> d) (reverse ds) of
 >           []    -> Nothing
->           (x:_) -> Just x
+>           (x:_) -> justQuant x
 >     dceiling (Horizons ds) d
 >       = case dropWhile (< d) ds of
 >           []    -> Nothing
->           (x:_) -> Just x
+>           (x:_) -> justQuant x
 > 
 > instance BoundedDimension Horizons where
 >     type Dependent Horizons = RunTime
->     dfirst (Horizons ds) = const $ head ds
->     dlast  (Horizons ds) = const $ last ds
->     denum  (Horizons ds) = const ds
+>     dfirst (Horizons ds) = constQuant $ head ds
+>     dlast  (Horizons ds) = constQuant $ last ds
+>     denum  (Horizons ds) = const (map Quant ds)

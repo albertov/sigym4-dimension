@@ -22,6 +22,7 @@ dimensión. Para ello necesitamos habilitar algunas extensiones de GHC
 porque no se pueden expresar con Haskell2010.
 
 > {-# LANGUAGE DeriveDataTypeable
+>            , DeriveFunctor
 >            , TypeFamilies
 >            , TypeOperators
 >            , FlexibleContexts
@@ -33,6 +34,10 @@ Se define el interfaz del módulo y se importan las librerías necesarias.
 > module Sigym4.Dimension.Types (
 >     Dimension(..)
 >   , BoundedDimension(..)
+>   , Quantized (..)
+>   , justQuant
+>   , constQuant
+>   , qZ
 >   , (:>)(..)
 > ) where
 > import Data.Typeable (Typeable)
@@ -44,18 +49,62 @@ Dimension
 ---------
 
 Una 'Dimension' es un conjunto ordenado, posiblemente infinito, de
-índices de dimension asociados 'DimensionIx'.
-Las funciones que expone permiten determinar si un elemento
-pertenece al conjunto o encontrar los elementos pertenecientes mayores
-o menores para poder enumerarlos a partir de cualquier punto y en
-cualquier dirección.
+índices discretos de dimension asociados 'DimensionIx'. Los índices que
+pertenecen a una dimensión se dice que están "cuantizados" y se envuelven
+con el tipo `Quantized` para señalarlo.
+
+Las funciones que las instancias implementan permiten:
+
+ * Preguntar si un elemento pertenece al conjunto mediante `delem`.
+ * Encontrar el siguiente elemento cuantizado menor o igual a un elemento dado
+   mediante `dfloor`.
+ * Encontrar el siguiente elemento cuantizado mayor o igual a un elemento dado
+   mediante `dceiling`.
+ * Encontrar el siguiente elemento cuantizado menor a un elemento cuantizado
+   dado mediante `dpred`.
+ * Encontrar el siguiente elemento cuantizado mayor a un elemento cuantizado
+   dado mediante `dsucc`.
+
+Todas las instancias deben satisfacer 6 propiedades:
+
+  1. ∀ dsucc    a ∊ dim, a ∊ dim, -> dsucc a > a
+  2. ∀ dpred    a ∊ dim, a ∊ dim  -> dpred a < a
+  3. ∀ dfloor   a ∊ dim, a        -> dfloor a <= a
+  4. ∀ dceiling a ∊ dim, a        -> dceiling a >= a
+  5. ∀ dfloor   a ∊ dim, dfloor b ∊ dim, dfloor c ∊ dim, a < b < c
+     -> dfloor a <= dfloor b <= dfloor c
+  6. ∀ dceiling   a ∊ dim, dceiling b ∊ dim, dceiling c ∊ dim, a > b > c
+     -> dceiling a >= dceiling b >= dceiling c
+
+Existe una especificación genérica válida para comprobarlas en cualquier
+instancia de `Dimension` en los tests.
+
+
+Definimos un envoltorio para etiquetar los valores que pertencecen a una
+dimensión. Esta información extra de tipo intenta prevenir un mal uso del
+API (eg: usar dsucc/dpred sobre elementos no cuantizados). Ojo, no impide
+que un valor cuantizado a ∊ dimA se use en dimB donde dimA y dimB son del
+mismo tipo de dimensión pero distintas (TODO: estudiar como prevenirlo con
+los tipos sin introducir chequeos en ejecución)
+
+> newtype Quantized a = Quant {unQuant::a}
+>   deriving (Eq, Ord, Show, Functor, Typeable)
+>
+> justQuant :: a -> Maybe (Quantized a)
+> justQuant = Just . Quant
+>
+> constQuant :: a -> b -> Quantized a
+> constQuant = const . Quant
+>
+> qZ :: Quantized ()
+> qZ = Quant ()
 
 > -- | A 'Dimension' is a possibly infinite ordered set of associated
 > --   'DimensionIx's
 > --  A finite dimension should also implement 'BoundedDimension' and
 > -- return 'Nothing' from 'dpred', 'dfloor', 'dsucc' and 'dceiling' when
 > -- the next element would be > maximum or < minimum
-> class (Eq (DimensionIx d), Ord (DimensionIx d))
+> class (Show d, Show (DimensionIx d), Eq (DimensionIx d), Ord (DimensionIx d))
 >   => Dimension d
 >   where
 >     -- | The associated type of the elements
@@ -67,29 +116,33 @@ cualquier dirección.
 >     -- | 'Just' the succesive element of the set. Since a
 >     --   'Dimension' can be of inifinite size it may
 >     --   never return 'Nothing'
->     dsucc :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dsucc :: d
+>           -> Quantized (DimensionIx d)
+>           -> Maybe (Quantized(DimensionIx d))
 >
 >     -- | Returns 'Just' the previous element of the set. Since a
 >     --   'Dimension' can be of inifinite size it should
 >     --   never return 'Nothing'
->     dpred :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dpred :: d
+>           -> Quantized (DimensionIx d)
+>           -> Maybe (Quantized(DimensionIx d))
 >
 >     -- | Clamps a 'DimensionIx' d which may not belong to
 >     --   the set to the closest value which is <= d, 
 >     --   'd' itself if it already belongs to the set.
->     dfloor :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dfloor :: d -> DimensionIx d -> Maybe (Quantized(DimensionIx d))
 >
 >     -- | Clamps a 'DimensionIx' d which possibly doesn't belong to
 >     --   the set to the closest value which is >= d, possibly
 >     --   'd' itself if it already belongs to the set.
->     dceiling :: d -> DimensionIx d -> Maybe (DimensionIx d)
+>     dceiling :: d -> DimensionIx d -> Maybe (Quantized(DimensionIx d))
 >
 >     {-# MINIMAL delem, dsucc, dpred, dfloor, dceiling #-}
 >
 >     -- | Similar to 'enumFrom' from 'Enum'
 >     --   A default implementation is provided in terms of 'dsucc' and 'dfloor'
 >     --   but instances may override to provide a more efficient implementation
->     denumUp :: d -> DimensionIx d -> [DimensionIx d]
+>     denumUp :: d -> DimensionIx d -> [Quantized(DimensionIx d)]
 >     denumUp d a = go (dfloor d a)
 >       where go Nothing  = []
 >             go (Just i) = i : go (dsucc d i)
@@ -98,7 +151,7 @@ cualquier dirección.
 >     --   A default implementation is provided in terms of 'dpred' and
 >     --   'dceiling' but instances may override to provide a more efficient
 >     --   implementation
->     denumDown :: d -> DimensionIx d -> [DimensionIx d]
+>     denumDown :: d -> DimensionIx d -> [Quantized(DimensionIx d)]
 >     denumDown d a = go (dceiling d a)
 >       where go Nothing  = []
 >             go (Just i) = i : go (dpred d i)
@@ -116,11 +169,12 @@ inferior y superior, ambas cerradas.
 > --   'Dimension a' must return 'Nothing' when out of bounds
 > class Dimension d => BoundedDimension d where
 >     type Dependent d
->     dfirst   :: d -> Dependent d -> DimensionIx d
->     dlast    :: d -> Dependent d -> DimensionIx d
+>     dfirst   :: d -> Quantized(Dependent d) -> Quantized(DimensionIx d)
+>     dlast    :: d -> Quantized(Dependent d) -> Quantized(DimensionIx d)
 >     {-# MINIMAL dfirst, dlast #-}
->     denum    :: d -> Dependent d -> [DimensionIx d]
->     denum d d2 = denumUp d (dfirst d d2)
+>     denum    :: d -> Quantized(Dependent d) -> [Quantized(DimensionIx d)]
+>     denum d d2 = denumUp d f
+>       where Quant f = dfirst d d2
 
 
 Comenzamos definiendo algunas instancias de Dimensiones típicas, la primera
@@ -132,13 +186,13 @@ indexar datos estáticos.
 >     delem () ()  = True
 >     dpred    _ _ = Nothing
 >     dsucc    _ _ = Nothing
->     dfloor   _ _ = Just ()
->     dceiling _ _ = Just ()
+>     dfloor   _ _ = justQuant ()
+>     dceiling _ _ = justQuant ()
 > 
 > instance BoundedDimension () where
 >     type Dependent () = ()
->     dfirst _ _  = ()
->     dlast  _ _  = ()
+>     dfirst _ _  = Quant ()
+>     dlast  _ _  = Quant ()
 > 
 
 
@@ -179,41 +233,49 @@ iterar las dimensiones interiores para pasar a la exterior.
 > 
 >     delem (a :> b) (da :> db) = a `delem` da && b `delem` db
 > 
->     dpred (da :> db) (a :> b)
->       | b `delem` db
->       = case dpred da a of
->           Just a' | a'>=dfirst da b
->                   -> Just (a' :> b)
->           _       -> case dpred db b of
->                        Nothing -> Nothing
->                        Just b' -> Just (dlast da b' :> b')
->       | otherwise  = dfloor db b >>= \b' -> dpred (da :> db) (a :> b')
+>     dpred (da :> db) (Quant (a :> b))
+>       = case dpred da (Quant a) of
+>           Just (Quant a') | Quant a'>=dfirst da (Quant b)
+>                   -> justQuant (a' :> b)
+>           _       -> case dpred db (Quant b) of
+>                        Nothing        -> Nothing
+>                        Just (Quant b') -> let Quant l = dlast da (Quant b')
+>                                          in justQuant (l :> b')
 > 
->     dsucc (da :> db) (a :> b)
->       | b `delem` db
->       = case dsucc da a of
->           Just a' | a'<=dlast da b
->                   -> Just (a' :> b)
->           _       -> case dsucc db b of
->                        Nothing -> Nothing
->                        Just b' -> Just (dfirst da b' :> b')
->       | otherwise  = dceiling db b >>= \b' -> dsucc (da :> db) (a :> b')
+>     dsucc (da :> db) (Quant (a :> b))
+>       = case dsucc da (Quant a) of
+>           Just (Quant a') | Quant a' <= dlast da (Quant b)
+>                   -> justQuant (a' :> b)
+>           _       -> case dsucc db (Quant b) of
+>                        Nothing        -> Nothing
+>                        Just (Quant b') -> let Quant f = dfirst da (Quant b')
+>                                          in justQuant (f :> b')
 > 
 >     dfloor (da :> db) (a :> b)
 >       | b `delem` db
->       = case dfloor da a of
->           Just a' | a'>=dfirst da b
->                   -> dfloor db b >>= \b' -> Just (a' :> b')
->           _       -> dpred  db b >>= \b' -> Just (dlast da b' :> b')
->       | otherwise  = dfloor db b >>= \b' -> Just (dlast da b' :> b')
+>       = let bn = Quant b
+>         in case dfloor da a of
+>           Just (Quant a') | Quant a'>= dfirst da bn
+>                   -> dfloor db b  >>= \(Quant b') -> justQuant (a' :> b')
+>           _       -> dpred  db bn >>= \(Quant b') ->
+>                                        let Quant l = dlast da (Quant b')
+>                                        in justQuant (l :> b')
+>       | otherwise  = dfloor db b  >>= \(Quant b') ->
+>                                        let Quant l = dlast da (Quant b')
+>                                        in justQuant (l :> b')
 > 
 >     dceiling (da :> db) (a :> b)
 >       | b `delem` db
->       = case dceiling da a of
->           Just a' | a'<=dlast da b
->                   -> dceiling db b >>= \b' -> Just (a' :> b')
->           _       -> dsucc    db b >>= \b' -> Just (dfirst da b' :> b')
->       | otherwise  = dceiling db b >>= \b' -> Just (dfirst da b' :> b')
+>       = let bn = Quant b
+>         in case dceiling da a of
+>           Just (Quant a') | Quant a' <= dlast da bn
+>                   -> dceiling db b  >>= \(Quant b') -> justQuant (a' :> b')
+>           _       -> dsucc    db bn >>= \(Quant b') ->
+>                                          let Quant f = dfirst da (Quant b')
+>                                          in justQuant (f :> b')
+>       | otherwise  = dceiling db b  >>= \(Quant b') ->
+>                                          let Quant f = dfirst da (Quant b')
+>                                          in justQuant (f :> b')
 
 El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
@@ -221,5 +283,9 @@ El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
 >   => BoundedDimension (a :> b)
 >   where
 >     type Dependent (a :> b) = Dependent b
->     dfirst (a :> b) c = let fb = dfirst b c in dfirst a fb :> fb
->     dlast  (a :> b) c = let lb = dlast  b c in dlast  a lb :> lb
+>     dfirst (a :> b) c = let Quant fb = dfirst b c
+>                             Quant fa = dfirst a (Quant fb)
+>                         in Quant (fa :> fb)
+>     dlast  (a :> b) c = let Quant lb = dlast b c
+>                             Quant la = dlast a (Quant lb)
+>                         in Quant (la :> lb)
