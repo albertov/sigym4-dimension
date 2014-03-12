@@ -217,7 +217,7 @@ instance Arbitrary Horizons where
 instance Arbitrary Horizon where
     arbitrary = oneof [ Minute <$> choose (-10000,10000)
                       , Hour   <$> choose (-10000,10000)
-                      , Day    <$> choose (-10000,10000)]
+                      , Day    <$> choose (-1000,1000)]
 
 instance Arbitrary (Schedule t) where
     arbitrary = Schedule <$> arbitrary
