@@ -38,7 +38,7 @@ Se define el interfaz del módulo...
 >     Dimension(..)
 >   , BoundedDimension(..)
 >   , Infinite (Inf)
->   , Quantized (..)
+>   , Quantized (unQuant)
 >   -- | * Atajos
 >   , idelem
 >   , idfloor
@@ -55,6 +55,9 @@ Se define el interfaz del módulo...
 >   , (:*)(..)
 >   -- | * Utilidades para instancias de 'Dimension'
 >   , getDep
+>   , runDim
+>   , irunDim
+>   , quant
 >   , yieldQuant
 >   , stopIteration
 > ) where
@@ -128,6 +131,9 @@ los tipos sin introducir chequeos en ejecución)
 
 > getDep :: Dim d (DDimensionIx d)
 > getDep = Dim id
+
+> quant :: a -> Dim d (Quantized a)
+> quant = return . Quant
 
 
 > type DDimensionIx d = Quantized (DimensionIx (Dependent d))

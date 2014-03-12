@@ -233,12 +233,12 @@ finita (`BoundedDimension`).
 >     type DimensionIx Horizons = Horizon
 >     type Dependent   Horizons = ()
 >     delem (Horizons ds) = return . (`elem` ds)
->     dpred (Horizons ds) (Quant d)
->       = case dropWhile (>= d) (reverse ds) of
+>     dpred (Horizons ds) d
+>       = case dropWhile (>= unQuant d) (reverse ds) of
 >           []    -> stopIteration
 >           (x:_) -> yieldQuant x
->     dsucc (Horizons ds) (Quant d)
->       = case dropWhile (<= d) ds of
+>     dsucc (Horizons ds) d
+>       = case dropWhile (<= unQuant d) ds of
 >           []    -> stopIteration
 >           (x:_) -> yieldQuant x
 >     dfloor (Horizons ds) d
@@ -251,6 +251,6 @@ finita (`BoundedDimension`).
 >           (x:_) -> yieldQuant x
 > 
 > instance BoundedDimension Horizons where
->     dfirst (Horizons ds) = return $ Quant $ head ds
->     dlast  (Horizons ds) = return $ Quant $ last ds
->     denum  (Horizons ds) = return (map Quant ds)
+>     dfirst (Horizons ds) = quant $ head ds
+>     dlast  (Horizons ds) = quant $ last ds
+>     -- denum  (Horizons ds) = return (map Quant ds)
