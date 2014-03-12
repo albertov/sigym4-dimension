@@ -36,8 +36,8 @@ spec = do
   dimensionSpec "Schedule ObservationTime"
                 (Proxy :: Proxy (Schedule ObservationTime))
 
-  dimensionSpec "Horizons :> Schedule RunTime"
-                (Proxy :: Proxy (Horizons :> Schedule RunTime))
+  dimensionSpec "Horizons :* Schedule RunTime"
+                (Proxy :: Proxy (Horizons :* Schedule RunTime))
 
 
   context "CronSchedule" $ do
@@ -208,8 +208,11 @@ instance Arbitrary UTCTime where
       = UTCTime <$> arbitrary
                 <*> (fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int))
 
-instance (Arbitrary a, Arbitrary b) => Arbitrary (a :> b) where
-    arbitrary = (:>) <$> arbitrary <*> arbitrary
+instance (Arbitrary a, Arbitrary b) => Arbitrary (a :* b) where
+    arbitrary = (:*) <$> arbitrary <*> arbitrary
+
+instance (Arbitrary a, Arbitrary b) => Arbitrary (a :~ b) where
+    arbitrary = (:~) <$> arbitrary <*> arbitrary
 
 instance Arbitrary Horizons where
     arbitrary = fromList <$> listOf1 arbitrary

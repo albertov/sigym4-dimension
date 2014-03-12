@@ -6,8 +6,9 @@ module Sigym4.Dimension (
   , module Time
 ) where
 import Sigym4.Dimension.Types as Types hiding ( Quantized(..)
-                                              , justQuant
-                                              , constQuant)
+                                              , yieldQuant
+                                              , stopIteration
+                                              , getDep )
 import Sigym4.Dimension.Time as Time hiding (Schedule(..))
 -- No exponemos en el API simple el constructor de Quantized para que la
 -- única manera de obtenerlos sea a traves de 'Dimension'.

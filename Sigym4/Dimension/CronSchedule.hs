@@ -243,7 +243,7 @@ modCeil  a m
 
 instance Dimension MinuteSpec where
     type DimensionIx MinuteSpec = Int
-    type Dependent   MinuteSpec = HourSpec
+    type Dependent   MinuteSpec = ()
     delem    (Minutes cs) = return . idelem     (CF cs 0 59)
     dpred    (Minutes cs) = return . idpred     (CF cs 0 59)
     dsucc    (Minutes cs) = return . idsucc     (CF cs 0 59)
@@ -256,7 +256,7 @@ instance BoundedDimension MinuteSpec where
 
 instance Dimension HourSpec where
     type DimensionIx HourSpec = Int
-    type Dependent   HourSpec = DayOfMonthSpec
+    type Dependent   HourSpec = ()
     delem    (Hours cs) = return . idelem     (CF cs 0 23)
     dpred    (Hours cs) = return . idpred     (CF cs 0 23)
     dsucc    (Hours cs) = return . idsucc     (CF cs 0 23)
@@ -269,7 +269,7 @@ instance BoundedDimension HourSpec where
 
 instance Dimension DayOfMonthSpec where
     type DimensionIx DayOfMonthSpec = Int
-    type Dependent   DayOfMonthSpec = MonthSpec :> Years
+    type Dependent   DayOfMonthSpec = MonthSpec :* Years
     delem cf i = monthCF cf (`idelem`  i)
     dpred cf i = monthCF cf (`idpred` i)
     dsucc cf i = monthCF cf (`idsucc`  i)
@@ -277,7 +277,7 @@ instance Dimension DayOfMonthSpec where
     dceiling cf i = monthCF cf (`idceiling` i)
 
 monthCF (DaysOfMonth cs) f
-  = getDep >>= (\(Quant (m:>y)) ->  return $ f (CF cs 1 (daysPerMonth y m)))
+  = getDep >>= (\(Quant (m:*y)) ->  return $ f (CF cs 1 (daysPerMonth y m)))
 
 instance BoundedDimension DayOfMonthSpec where
     dfirst cf = monthCF cf idfirst
@@ -293,7 +293,7 @@ daysPerMonth yr mth
 
 instance Dimension MonthSpec where
     type DimensionIx MonthSpec = Int
-    type Dependent   MonthSpec = Years
+    type Dependent   MonthSpec = ()
     delem    (Months cs) = return . idelem     (CF cs 1 12)
     dpred    (Months cs) = return . idpred     (CF cs 1 12)
     dsucc    (Months cs) = return . idsucc     (CF cs 1 12)
@@ -315,16 +315,16 @@ instance Dimension Years where
 
 type TimeIx = DimensionIx CronScheduleDim
 type CronScheduleDim = MinuteSpec
-                    :> HourSpec
-                    :> DayOfMonthSpec 
-                    :> (MonthSpec :> Years)
+                    :* HourSpec
+                    :* DayOfMonthSpec 
+                    :~ (MonthSpec :* Years)
 data Years = Years deriving Show
 
 ndimIxToTime :: Quantized TimeIx -> Quantized UTCTime
 ndimIxToTime = fmap dimIxToTime
 
 dimIxToTime :: TimeIx -> UTCTime
-dimIxToTime (mins :> hours :> dom :> (month :> year))
+dimIxToTime (mins :* hours :* dom :* (month :* year))
   = UTCTime (fromGregorian (fromIntegral year) month dom)
             (fromIntegral $ (hours*60+mins) * 60)
 
@@ -333,11 +333,11 @@ ntimeToDimIx = fmap timeToDimIx
 
 timeToDimIx :: UTCTime -> TimeIx
 timeToDimIx UTCTime {utctDay = uDay, utctDayTime = uTime }
-  = mn :> hr :> dom :> (mth :> fromIntegral yr)
+  = mn :* hr :* dom :* (mth :* fromIntegral yr)
   where (yr, mth, dom) = toGregorian uDay
         --(_, _, dow)    = toWeekDate uDay
         TimeOfDay { todHour = hr, todMin  = mn} = timeToTimeOfDay uTime
 
 scheduleToDim :: CronSchedule -> CronScheduleDim
 scheduleToDim CronSchedule{..}
-    = minute :> hour :> dayOfMonth :> (month :> Years)
+    = minute :* hour :* dayOfMonth :~ (month :* Years)

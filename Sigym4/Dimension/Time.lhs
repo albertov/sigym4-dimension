@@ -231,7 +231,7 @@ finita (`BoundedDimension`).
  
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
->     type Dependent   Horizons = Schedule RunTime
+>     type Dependent   Horizons = ()
 >     delem (Horizons ds) = return . (`elem` ds)
 >     dpred (Horizons ds) (Quant d)
 >       = case dropWhile (>= d) (reverse ds) of

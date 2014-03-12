@@ -3,14 +3,14 @@ Dimensiones
 
 Este módulo implementa el concepto de dimensiones no-espaciales en Sigym4.
 Éstas pueden ser temporales (observación, fecha de predicción, ..), de
-horizonte de predicción ('Horizon') o nula.
+horizonte de predicción (`Horizon`) o nula.
 
 A diferencia de Sigym3 se pueden definir nuevas dimensiones implementando
-instancias de la clase 'Dimension'.
+instancias de la clase `Dimension`.
 
-Hay dos tipos principales, las dimensiones (de clase 'Dimension a'), que
+Hay dos tipos principales, las dimensiones (de clase `Dimension a`), que
 representan conjuntos ordenados, finitos ('BoundedDimension') o infinitos,
-de índices de dimensión ('DimensionIx a'). Los productos de dimensiones
+de índices de dimensión (`DimensionIx a`). Los productos de dimensiones
 (en ciertos casos que se explicarán más adelante) también son
 dimensiones por lo que se pueden definir sin demasiada burocracía nuevas
 dimensiones que son producto de otras.
@@ -35,11 +35,11 @@ porque no se pueden expresar con Haskell2010.
 Se define el interfaz del módulo...
 
 > module Sigym4.Dimension.Types (
+>   -- | * Tipos
 >     Dimension(..)
 >   , BoundedDimension(..)
 >   , Quantized (..)
->   , yieldQuant
->   , stopIteration
+>   -- | * Atajos
 >   , idelem
 >   , idfloor
 >   , idceiling
@@ -51,15 +51,18 @@ Se define el interfaz del módulo...
 >   , idlast
 >   , idenum
 >   , idenumr
+>   , (:~)(..)
+>   , (:*)(..)
+>   -- | * Utilidades para instancias de 'Dimension'
 >   , getDep
->   , (:>)(..)
+>   , yieldQuant
+>   , stopIteration
 > ) where
 
 ... y se importan las librerías necesarias:
 
 > import Control.Monad.Loops (unfoldrM)
 > import Data.Typeable (Typeable)
-
 
 Comenzamos definiendo las dos clases principales.
 
@@ -85,14 +88,14 @@ Las funciones que las instancias implementan permiten:
 
 Todas las instancias deben satisfacer 6 propiedades:
 
-  1. ∀ dsucc    a ∊ dim, a ∊ dim, -> dsucc a > a
-  2. ∀ dpred    a ∊ dim, a ∊ dim  -> dpred a < a
-  3. ∀ dfloor   a ∊ dim, a        -> dfloor a <= a
-  4. ∀ dceiling a ∊ dim, a        -> dceiling a >= a
-  5. ∀ dfloor   a ∊ dim, dfloor b ∊ dim, dfloor c ∊ dim, a < b < c
-     -> dfloor a <= dfloor b <= dfloor c
-  6. ∀ dceiling   a ∊ dim, dceiling b ∊ dim, dceiling c ∊ dim, a > b > c
-     -> dceiling a >= dceiling b >= dceiling c
+  1. ∀ dsucc a ∊ dim, a ∊ dim, ⇒ dsucc a > a
+  2. ∀ dpred a ∊ dim, a ∊ dim  ⇒  dpred a < a
+  3. ∀ dfloor a ∊ dim, a       ⇒  dfloor a <= a
+  4. ∀ dceiling a ∊ dim, a     ⇒  dceiling a >= a
+  5. ∀ dfloor a ∊ dim, dfloor b ∊ dim, dfloor c ∊ dim, a < b < c
+     ⇒  dfloor a <= dfloor b <= dfloor c
+  6. ∀ dceiling a ∊ dim, dceiling b ∊ dim, dceiling c ∊ dim, a > b > c
+     ⇒  dceiling a >= dceiling b >= dceiling c
 
 Existe una especificación genérica válida para comprobarlas en cualquier
 instancia de `Dimension` en los tests.
@@ -273,18 +276,32 @@ Dimensiones producto
 
 A continuación se prepara el terreno para definir dimensiones como
 productos de otras, comenzando por un constructor para productos de
-dimensiones y sus índices. La definición es similar a la de una tupla.
+dimensiones y sus índices. Hay dos maneras de combinar dimensiones en producto:
+
+ * Con el operador `:*`, por ejemplo `Horizons :* Schedule Runtime`, cuando
+   la dimensión de la izquierda es independiente.
+
+ * Con el operador `:~` cuando la dimensión de la izquierda depende de los
+   índices de la derecha.
+
+Para combinar los índices de ambos tipos de dimensiones se utiliza el
+operador `:*`
  
-> infixl 3 :>
-> data ts :> t
-> 	= !ts :> !t
+> infixl 3 :*
+> data ts :* t
+> 	= !ts :* !t
 > 	deriving (Show, Eq, Read, Typeable)
-> 
 
-Éste producto es ordenable si sus elementos lo son.
+> infixl 3 :~
+> data ts :~ t
+> 	= !ts :~ !t
+> 	deriving (Show, Eq, Read, Typeable)
 
-> instance (Ord a, Ord b) => Ord (a :> b) where
->     (a :> b) `compare` (a' :> b')
+Los productos son ordenables si sus elementos lo son. Esta instancia la
+necesitamos para que los índices sean ordenables.
+
+> instance (Ord a, Ord b) => Ord (a :* b) where
+>     (a :* b) `compare` (a' :* b')
 >       = case b `compare` b' of
 >           EQ -> a `compare` a'
 >           o  -> o
@@ -298,63 +315,129 @@ sistema de tipos requiriendo `BoundedDimension` en la variable de tipo `a`.
 Ésto es así porque si no sería imposible determinar cuando se ha terminado de
 iterar las dimensiones interiores para pasar a la exterior.
 
-> withDep d = getDep >>= return . runDim d
-
 > instance (BoundedDimension a, Dimension b, Dependent a ~ b)
->   => Dimension (a :> b) where
->     type DimensionIx (a :> b) = DimensionIx a :> DimensionIx b
->     type Dependent (a :> b)   = Dependent b
+>   => Dimension (a :~ b) where
+>     type DimensionIx (a :~ b) = DimensionIx a :* DimensionIx b
+>     type Dependent (a :~ b)   = Dependent b
 > 
->     delem (da :> db) (a :> b) = do
+>     delem (da :~ db) (a :* b) = do
 >      eb <- withDep $ delem db b
 >      return $ if eb then runDim (delem da a) (Quant b) else False
 > 
->     dpred (da :> db) (Quant (a :> b))
+>     dpred (da :~ db) (Quant (a :* b))
 >       = maybe (withPred db (Quant b) (yieldWithLast da))
->               (\a' -> yieldQuant (unQuant a' :> b))
+>               (\a' -> yieldQuant (unQuant a' :* b))
 >               (runDim (dpred da (Quant a)) (Quant b))
 >
->     dsucc (da :> db) (Quant (a :> b))
+>     dsucc (da :~ db) (Quant (a :* b))
 >       = maybe (withSucc db (Quant b) (yieldWithFirst da))
->               (\a' -> yieldQuant (unQuant a' :> b))
+>               (\a' -> yieldQuant (unQuant a' :* b))
 >               (runDim (dsucc da (Quant a)) (Quant b))
 > 
->     dfloor (da :> db) (a :> b)
+>     dfloor (da :~ db) (a :* b)
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withPred db (Quant b) (yieldWithLast da))
->                 (\a' -> yieldQuant (unQuant a' :> b))
+>                 (\a' -> yieldQuant (unQuant a' :* b))
 >                 (runDim (dfloor da a) (Quant b))
->         else withDep (dfloor db b) >>= maybe stopIteration (yieldWithLast da)
+>         else withDep (dfloor db b)
+>          >>= maybe stopIteration (yieldWithLast da)
 >
->     dceiling (da :> db) (a :> b)
+>     dceiling (da :~ db) (a :* b)
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withSucc db (Quant b) (yieldWithFirst da))
->                 (\a' -> yieldQuant (unQuant a' :> b))
+>                 (\a' -> yieldQuant (unQuant a' :* b))
 >                 (runDim (dceiling da a) (Quant b))
->         else withDep (dceiling db b) >>= maybe stopIteration (yieldWithFirst da)
->
+>         else withDep (dceiling db b)
+>          >>= maybe stopIteration (yieldWithFirst da)
+
+
+Las utilidades que acabamos de utilizar.
+
+> withDep d = getDep >>= return . runDim d
 >
 > withSucc d v f = withDep (dsucc d v) >>= maybe stopIteration f
 > withPred d v f = withDep (dpred d v) >>= maybe stopIteration f
 >
 > yieldWithLast da b
->   = yieldQuant (unQuant (runDim (dlast da) b) :> unQuant b)
+>   = yieldQuant (unQuant (runDim (dlast da) b) :* unQuant b)
 > yieldWithFirst da b
->   = yieldQuant (unQuant (runDim (dfirst da) b) :> unQuant b)
+>   = yieldQuant (unQuant (runDim (dfirst da) b) :* unQuant b)
+>
+> iyieldWithLast da b
+>   = yieldQuant (unQuant (irunDim (dlast da)) :* unQuant b)
+> iyieldWithFirst da b
+>   = yieldQuant (unQuant (irunDim (dfirst da)) :* unQuant b)
 
-El producto de dos `BoundedDimension` es a su vez una `BoundedDimension`
+
+Definimos de manera similar la instancia de `Dimension` para los productos
+de dimension independiente y dimensión. La única diferencia es que no
+pasamos el índice de la dimensión exterior a la interior (usando `irunDim`).
+
+> instance (BoundedDimension a, Dimension b, Dependent a ~ ())
+>   => Dimension (a :* b) where
+>     type DimensionIx (a :* b) = DimensionIx a :* DimensionIx b
+>     type Dependent (a :* b)   = Dependent b
+> 
+>     delem (da :* db) (a :* b) = do
+>      eb <- withDep $ delem db b
+>      return $ if eb then irunDim (delem da a) else False
+> 
+>     dpred (da :* db) (Quant (a :* b))
+>       = maybe (withPred db (Quant b) (iyieldWithLast da))
+>               (\a' -> yieldQuant (unQuant a' :* b))
+>               (irunDim (dpred da (Quant a)))
+>
+>     dsucc (da :* db) (Quant (a :* b))
+>       = maybe (withSucc db (Quant b) (iyieldWithFirst da))
+>               (\a' -> yieldQuant (unQuant a' :* b))
+>               (irunDim (dsucc da (Quant a)))
+> 
+>     dfloor (da :* db) (a :* b)
+>       = withDep (delem db b) >>= \isElemOfB ->
+>         if isElemOfB then
+>           maybe (withPred db (Quant b) (iyieldWithLast da))
+>                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (irunDim (dfloor da a))
+>         else withDep (dfloor db b)
+>          >>= maybe stopIteration (iyieldWithLast da)
+>
+>     dceiling (da :* db) (a :* b)
+>       = withDep (delem db b) >>= \isElemOfB ->
+>         if isElemOfB then
+>           maybe (withSucc db (Quant b) (iyieldWithFirst da))
+>                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (irunDim (dceiling da a))
+>         else withDep (dceiling db b)
+>          >>= maybe stopIteration (iyieldWithFirst da)
+
+Los productos `:~` de dos `BoundedDimension` es a su vez una `BoundedDimension`
 
 > instance (BoundedDimension a, BoundedDimension b, b ~ Dependent a)
->   => BoundedDimension (a :> b)
+>   => BoundedDimension (a :~ b)
 >   where
->     dfirst (a :> b) = do
+>     dfirst (a :~ b) = do
 >       fb <- withDep (dfirst b)
 >       let fa = runDim (dfirst a) fb
->       return $ Quant (unQuant fa :> unQuant fb)
+>       return $ Quant (unQuant fa :* unQuant fb)
 >
->     dlast  (a :> b) = do
+>     dlast  (a :~ b) = do
 >       lb <- withDep (dlast b)
 >       let la = runDim (dlast a) lb
->       return $ Quant (unQuant la :> unQuant lb)
+>       return $ Quant (unQuant la :* unQuant lb)
+
+Los productos `:+` también.
+
+> instance (BoundedDimension a, BoundedDimension b, Dependent a ~ ())
+>   => BoundedDimension (a :* b)
+>   where
+>     dfirst (a :* b) = do
+>       fb <- withDep (dfirst b)
+>       let fa = irunDim (dfirst a)
+>       return $ Quant (unQuant fa :* unQuant fb)
+>
+>     dlast  (a :* b) = do
+>       lb <- withDep (dlast b)
+>       let la = irunDim (dlast a)
+>       return $ Quant (unQuant la :* unQuant lb)
