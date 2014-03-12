@@ -114,17 +114,20 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 > instance Time t => Dimension (Schedule t) where
 >     type DimensionIx (Schedule t) = t
 >     type Dependent   (Schedule t) = ()
->     delem    (Schedule s) _ = idelem s . toUTCTime
->     dpred    (Schedule s) _ = fmap nfromUTCTime . idpred s     . ntoUTCTime
->     dsucc    (Schedule s) _ = fmap nfromUTCTime . idsucc s     . ntoUTCTime
->     dfloor   (Schedule s) _ = fmap nfromUTCTime . idfloor s    . toUTCTime
->     dceiling (Schedule s) _ = fmap nfromUTCTime . idceiling s  . toUTCTime
+>     delem    (Schedule s) = return . idelem s . toUTCTime
+>     dpred    (Schedule s) = return . nadaptMaybeTime (idpred s)
+>     dsucc    (Schedule s) = return . nadaptMaybeTime (idsucc s)
+>     dfloor   (Schedule s) = return . adaptMaybeTime  (idfloor s)
+>     dceiling (Schedule s) = return . adaptMaybeTime  (idceiling s)
 
 > nfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
 > nfromUTCTime = fmap fromUTCTime
 
 > ntoUTCTime :: Time t => Quantized t -> Quantized UTCTime
 > ntoUTCTime = fmap toUTCTime
+
+> adaptMaybeTime f = fmap nfromUTCTime . f . toUTCTime
+> nadaptMaybeTime f = fmap nfromUTCTime . f . ntoUTCTime
 
 Horizontes
 ----------
@@ -229,25 +232,25 @@ finita (`BoundedDimension`).
 > instance Dimension Horizons where
 >     type DimensionIx Horizons = Horizon
 >     type Dependent   Horizons = Schedule RunTime
->     delem (Horizons ds) _ = (`elem` ds)
->     dpred (Horizons ds) _ (Quant d)
+>     delem (Horizons ds) = return . (`elem` ds)
+>     dpred (Horizons ds) (Quant d)
 >       = case dropWhile (>= d) (reverse ds) of
->           []    -> Nothing
->           (x:_) -> justQuant x
->     dsucc (Horizons ds) _ (Quant d)
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dsucc (Horizons ds) (Quant d)
 >       = case dropWhile (<= d) ds of
->           []    -> Nothing
->           (x:_) -> justQuant x
->     dfloor (Horizons ds) _ d
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dfloor (Horizons ds) d
 >       = case dropWhile (> d) (reverse ds) of
->           []    -> Nothing
->           (x:_) -> justQuant x
->     dceiling (Horizons ds) _ d
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dceiling (Horizons ds) d
 >       = case dropWhile (< d) ds of
->           []    -> Nothing
->           (x:_) -> justQuant x
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
 > 
 > instance BoundedDimension Horizons where
->     dfirst (Horizons ds) = constQuant $ head ds
->     dlast  (Horizons ds) = constQuant $ last ds
->     denum  (Horizons ds) = const (map Quant ds)
+>     dfirst (Horizons ds) = return $ Quant $ head ds
+>     dlast  (Horizons ds) = return $ Quant $ last ds
+>     denum  (Horizons ds) = return (map Quant ds)
