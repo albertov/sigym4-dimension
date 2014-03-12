@@ -109,18 +109,16 @@ que un valor cuantizado a ∊ dimA se use en dimB donde dimA y dimB son del
 mismo tipo de dimensión pero distintas (TODO: estudiar como prevenirlo con
 los tipos sin introducir chequeos en ejecución)
 
-> newtype Quantized a = Quant {unQuant::a}
+> newtype Quantized a = Quant {unQuant :: a}
 >   deriving (Eq, Ord, Show, Functor, Typeable)
 
-> yieldQuant :: Monad m => a -> m (Maybe (Quantized a))
+> yieldQuant :: a -> Dim d (Maybe (Quantized a))
 > yieldQuant = return . Just . Quant
 >
-> stopIteration :: Monad m => m (Maybe a)
+> stopIteration :: Dim d (Maybe a)
 > stopIteration = return Nothing
 
-
-> data family Dim d a
-> data instance Dim d a = Dim {runDim :: DDimensionIx d -> a}
+> data Dim d a = Dim {runDim :: DDimensionIx d -> a}
 
 > instance Functor (Dim d) where
 >    fmap f m = Dim $ \r -> f (runDim m r)
@@ -195,7 +193,7 @@ los tipos sin introducir chequeos en ejecución)
 >       where go Nothing  = stopIteration
 >             go (Just i) = fmap (\next -> Just (i,next)) (dpred d i)
 
-> irunDim :: (Dimension d, DimensionIx (Dependent d) ~ ())
+> irunDim :: (Dimension d, Dependent d ~ ())
 >        => Dim d a -> a
 > irunDim d = runDim d qZ
 >
@@ -205,21 +203,21 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 > qZ :: Quantized ()
 > qZ = Quant ()
 
-> idelem :: (Dimension d, DimensionIx (Dependent d) ~ ())
+> idelem :: (Dimension d, Dependent d ~ ())
 >   => d -> DimensionIx d -> Bool
 > idelem d = irunDim . delem d
 
-> idfloor, idceiling :: (Dimension d, DimensionIx (Dependent d) ~ ())
+> idfloor, idceiling :: (Dimension d, Dependent d ~ ())
 >   => d -> DimensionIx d -> Maybe (Quantized (DimensionIx d))
 > idfloor d = irunDim . dfloor d
 > idceiling d = irunDim . dceiling d
 
-> idpred, idsucc :: (Dimension d, DimensionIx (Dependent d) ~ ())
+> idpred, idsucc :: (Dimension d, Dependent d ~ ())
 >   => d -> Quantized (DimensionIx d) -> Maybe (Quantized (DimensionIx d))
 > idpred d = irunDim . dpred d
 > idsucc d = irunDim . dsucc d
 
-> idenumUp, idenumDown :: (Dimension d, DimensionIx (Dependent d) ~ ())
+> idenumUp, idenumDown :: (Dimension d, Dependent d ~ ())
 >                      => d -> DimensionIx d -> [Quantized (DimensionIx d)]
 > idenumUp d = irunDim . denumUp d 
 > idenumDown d = irunDim . denumDown d
@@ -247,12 +245,12 @@ inferior y superior, ambas cerradas.
 
 Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
 
-> idfirst, idlast :: (BoundedDimension d, DimensionIx (Dependent d) ~ ())
+> idfirst, idlast :: (BoundedDimension d, Dependent d ~ ())
 >                 => d -> Quantized (DimensionIx d)
 > idfirst = irunDim . dfirst
 > idlast = irunDim . dlast
 
-> idenum, idenumr :: (BoundedDimension d, DimensionIx (Dependent d) ~ ())
+> idenum, idenumr :: (BoundedDimension d, Dependent d ~ ())
 >                 => d -> [Quantized (DimensionIx d)]
 > idenum = irunDim . denum
 > idenumr = irunDim . denumr

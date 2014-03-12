@@ -76,7 +76,7 @@ spec = do
 --   'Dimension' en cualquier instancia.
 dimensionSpec :: forall dim.
   ( Arbitrary dim, Arbitrary (DimensionIx dim), Dimension dim
-  , DimensionIx (Dependent dim) ~ ())
+  , Dependent dim ~ ())
   => String -> Proxy dim -> Spec
 dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idsucc" $ do
