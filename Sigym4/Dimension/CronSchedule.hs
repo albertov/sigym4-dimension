@@ -29,13 +29,13 @@ instance Dimension CronSchedule where
     type DimensionIx CronSchedule = UTCTime
     type Dependent   CronSchedule = ()
     delem    s = return . idelem (scheduleToDim s) . timeToDimIx
-    dpred    s = return . nadaptMaybeTime (idpred (scheduleToDim s))
-    dsucc    s = return . nadaptMaybeTime (idsucc (scheduleToDim s))
+    dpred    s = return . qadaptMaybeTime (idpred (scheduleToDim s))
+    dsucc    s = return . qadaptMaybeTime (idsucc (scheduleToDim s))
     dfloor   s = return . adaptMaybeTime (idfloor (scheduleToDim s))
     dceiling s = return . adaptMaybeTime (idceiling (scheduleToDim s))
 
 adaptMaybeTime f = fmap ndimIxToTime . f . timeToDimIx
-nadaptMaybeTime f = fmap ndimIxToTime . f . ntimeToDimIx
+qadaptMaybeTime f = fmap ndimIxToTime . f . qtimeToDimIx
 
 data BCronField = CF CronField Int Int deriving Show
 
@@ -241,47 +241,22 @@ modCeil  a m
   | otherwise = a + (m-md)
   where md = a `mod` m
 
-instance Dimension MinuteSpec where
-    type DimensionIx MinuteSpec = Int
-    type Dependent   MinuteSpec = ()
-    delem    (Minutes cs) = return . idelem     (CF cs 0 59)
-    dpred    (Minutes cs) = return . idpred     (CF cs 0 59)
-    dsucc    (Minutes cs) = return . idsucc     (CF cs 0 59)
-    dfloor   (Minutes cs) = return . idfloor    (CF cs 0 59)
-    dceiling (Minutes cs) = return . idceiling  (CF cs 0 59)
-
-instance BoundedDimension MinuteSpec where
-    dfirst (Minutes cs) = return $ idfirst (CF cs 0 59)
-    dlast  (Minutes cs) = return $ idlast  (CF cs 0 59)
-
-instance Dimension HourSpec where
-    type DimensionIx HourSpec = Int
-    type Dependent   HourSpec = ()
-    delem    (Hours cs) = return . idelem     (CF cs 0 23)
-    dpred    (Hours cs) = return . idpred     (CF cs 0 23)
-    dsucc    (Hours cs) = return . idsucc     (CF cs 0 23)
-    dfloor   (Hours cs) = return . idfloor    (CF cs 0 23)
-    dceiling (Hours cs) = return . idceiling  (CF cs 0 23)
-
-instance BoundedDimension HourSpec where
-    dfirst (Hours cs) = return $ idfirst (CF cs 0 23)
-    dlast  (Hours cs) = return $ idlast  (CF cs 0 23)
-
 instance Dimension DayOfMonthSpec where
     type DimensionIx DayOfMonthSpec = Int
-    type Dependent   DayOfMonthSpec = MonthSpec :* Years
-    delem cf i = monthCF cf (`idelem`  i)
-    dpred cf i = monthCF cf (`idpred` i)
-    dsucc cf i = monthCF cf (`idsucc`  i)
-    dfloor cf i = monthCF cf (`idfloor` i)
+    type Dependent   DayOfMonthSpec = BCronField :* Infinite Int
+    delem    cf i = monthCF cf (`idelem`    i)
+    dpred    cf i = monthCF cf (`idpred`    i)
+    dsucc    cf i = monthCF cf (`idsucc`    i)
+    dfloor   cf i = monthCF cf (`idfloor`   i)
     dceiling cf i = monthCF cf (`idceiling` i)
-
-monthCF (DaysOfMonth cs) f
-  = getDep >>= (\(Quant (m:*y)) ->  return $ f (CF cs 1 (daysPerMonth y m)))
 
 instance BoundedDimension DayOfMonthSpec where
     dfirst cf = monthCF cf idfirst
     dlast  cf = monthCF cf idlast
+
+monthCF (DaysOfMonth cs) f
+  = getDep >>= (\(Quant (m:*y)) ->  return $ f (CF cs 1 (daysPerMonth y m)))
+
 
 daysPerMonth :: Int -> Int -> Int
 daysPerMonth yr mth
@@ -291,34 +266,11 @@ daysPerMonth yr mth
   | otherwise                     = 31
   where isLeapYear' = isLeapYear . fromIntegral
 
-instance Dimension MonthSpec where
-    type DimensionIx MonthSpec = Int
-    type Dependent   MonthSpec = ()
-    delem    (Months cs) = return . idelem     (CF cs 1 12)
-    dpred    (Months cs) = return . idpred     (CF cs 1 12)
-    dsucc    (Months cs) = return . idsucc     (CF cs 1 12)
-    dfloor   (Months cs) = return . idfloor    (CF cs 1 12)
-    dceiling (Months cs) = return . idceiling  (CF cs 1 12)
-
-instance BoundedDimension MonthSpec where
-    dfirst (Months cs) = return $ idfirst (CF cs  1 12)
-    dlast  (Months cs) = return $ idlast  (CF cs  1 12)
-
-instance Dimension Years where
-    type DimensionIx Years = Int
-    type Dependent   Years = ()
-    delem    _ _         = return True
-    dpred    _ (Quant i) = yieldQuant (i-1)
-    dsucc    _ (Quant i) = yieldQuant (i+1)
-    dfloor   _ a         = yieldQuant a
-    dceiling _ a         = yieldQuant a
-
 type TimeIx = DimensionIx CronScheduleDim
-type CronScheduleDim = MinuteSpec
-                    :* HourSpec
+type CronScheduleDim = BCronField
+                    :* BCronField
                     :* DayOfMonthSpec 
-                    :~ (MonthSpec :* Years)
-data Years = Years deriving Show
+                    :~ (BCronField :* Infinite Int)
 
 ndimIxToTime :: Quantized TimeIx -> Quantized UTCTime
 ndimIxToTime = fmap dimIxToTime
@@ -328,8 +280,8 @@ dimIxToTime (mins :* hours :* dom :* (month :* year))
   = UTCTime (fromGregorian (fromIntegral year) month dom)
             (fromIntegral $ (hours*60+mins) * 60)
 
-ntimeToDimIx :: Quantized UTCTime -> Quantized TimeIx
-ntimeToDimIx = fmap timeToDimIx
+qtimeToDimIx :: Quantized UTCTime -> Quantized TimeIx
+qtimeToDimIx = fmap timeToDimIx
 
 timeToDimIx :: UTCTime -> TimeIx
 timeToDimIx UTCTime {utctDay = uDay, utctDayTime = uTime }
@@ -339,5 +291,8 @@ timeToDimIx UTCTime {utctDay = uDay, utctDayTime = uTime }
         TimeOfDay { todHour = hr, todMin  = mn} = timeToTimeOfDay uTime
 
 scheduleToDim :: CronSchedule -> CronScheduleDim
-scheduleToDim CronSchedule{..}
-    = minute :* hour :* dayOfMonth :~ (month :* Years)
+scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* doms :~ (CF mths 1 12 :* Inf)
+  where CronSchedule { minute     = Minutes mins
+                     , hour       = Hours hrs
+                     , dayOfMonth = doms
+                     , month      = Months mths} = cs

@@ -28,7 +28,6 @@ porque no se pueden expresar con Haskell2010.
 >            , FlexibleContexts
 >            , FlexibleInstances
 >            , ScopedTypeVariables
->            , MultiParamTypeClasses
 >            #-}
 > 
 
@@ -38,6 +37,7 @@ Se define el interfaz del módulo...
 >   -- | * Tipos
 >     Dimension(..)
 >   , BoundedDimension(..)
+>   , Infinite (Inf)
 >   , Quantized (..)
 >   -- | * Atajos
 >   , idelem
@@ -63,8 +63,6 @@ Se define el interfaz del módulo...
 
 > import Control.Monad.Loops (unfoldrM)
 > import Data.Typeable (Typeable)
-
-Comenzamos definiendo las dos clases principales.
 
 Dimension
 ---------
@@ -130,6 +128,7 @@ los tipos sin introducir chequeos en ejecución)
 
 > getDep :: Dim d (DDimensionIx d)
 > getDep = Dim id
+
 
 > type DDimensionIx d = Quantized (DimensionIx (Dependent d))
 
@@ -270,6 +269,19 @@ indexar datos estáticos.
 >     dlast  _ = return qZ
 > 
 
+> data Infinite a = Inf deriving Show
+
+> instance (Show a, Num a, Ord a, Bounded a) => Dimension (Infinite a) where
+>     type DimensionIx (Infinite a) = a
+>     type Dependent   (Infinite a) = ()
+>
+>     delem    _ _         = return True
+>     dpred    _ (Quant i) = if i==minBound then stopIteration
+>                            else yieldQuant (i-1)
+>     dsucc    _ (Quant i) = if i==maxBound then stopIteration
+>                            else yieldQuant (i+1)
+>     dfloor   _ a         = yieldQuant a
+>     dceiling _ a         = yieldQuant a
 
 Dimensiones producto
 --------------------

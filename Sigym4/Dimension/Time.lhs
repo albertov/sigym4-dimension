@@ -115,19 +115,19 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 >     type DimensionIx (Schedule t) = t
 >     type Dependent   (Schedule t) = ()
 >     delem    (Schedule s) = return . idelem s . toUTCTime
->     dpred    (Schedule s) = return . nadaptMaybeTime (idpred s)
->     dsucc    (Schedule s) = return . nadaptMaybeTime (idsucc s)
+>     dpred    (Schedule s) = return . qadaptMaybeTime (idpred s)
+>     dsucc    (Schedule s) = return . qadaptMaybeTime (idsucc s)
 >     dfloor   (Schedule s) = return . adaptMaybeTime  (idfloor s)
 >     dceiling (Schedule s) = return . adaptMaybeTime  (idceiling s)
 
-> nfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
-> nfromUTCTime = fmap fromUTCTime
+> qfromUTCTime :: Time t => Quantized UTCTime -> Quantized t
+> qfromUTCTime = fmap fromUTCTime
 
-> ntoUTCTime :: Time t => Quantized t -> Quantized UTCTime
-> ntoUTCTime = fmap toUTCTime
+> qtoUTCTime :: Time t => Quantized t -> Quantized UTCTime
+> qtoUTCTime = fmap toUTCTime
 
-> adaptMaybeTime f = fmap nfromUTCTime . f . toUTCTime
-> nadaptMaybeTime f = fmap nfromUTCTime . f . ntoUTCTime
+> adaptMaybeTime f = fmap qfromUTCTime . f . toUTCTime
+> qadaptMaybeTime f = fmap qfromUTCTime . f . qtoUTCTime
 
 Horizontes
 ----------
