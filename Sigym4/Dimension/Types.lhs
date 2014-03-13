@@ -90,7 +90,8 @@ Las funciones que las instancias implementan permiten:
  * Encontrar el siguiente elemento cuantizado mayor a un elemento cuantizado
    dado mediante `dsucc`.
 
-Todas las instancias deben satisfacer 6 propiedades:
+Todas las instancias deben satisfacer 8 propiedades para garantizar continuidad
+y buena ordenación:
 
   1. ∀ dsucc a ∊ dim, a ∊ dim, ⇒ dsucc a > a
   2. ∀ dpred a ∊ dim, a ∊ dim  ⇒  dpred a < a
@@ -100,6 +101,10 @@ Todas las instancias deben satisfacer 6 propiedades:
      ⇒  dfloor a <= dfloor b <= dfloor c
   6. ∀ dceiling a ∊ dim, dceiling b ∊ dim, dceiling c ∊ dim, a > b > c
      ⇒  dceiling a >= dceiling b >= dceiling c
+  7. ∀ dpred a ∊ dim, dpred b ∊ dim, dpred c ∊ dim, a < b < c
+     ⇒  dpred a < dpred b < dpred c
+  8. ∀ dsucc a ∊ dim, dsucc b ∊ dim, dsucc c ∊ dim, a > b > c
+     ⇒  dsucc a > dsucc b > dsucc c
 
 Existe una especificación genérica válida para comprobarlas en cualquier
 instancia de `Dimension` en los tests.
