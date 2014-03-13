@@ -86,12 +86,43 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
             Just v = norm
         in isJust norm ==> fmap (`compare` v) (idsucc d v) == Just GT
 
+    it "application preserves ordering" $ property $
+        \((d::dim), (a,b,c)) ->
+          let fa'     = fmap (idsucc d) (idfloor d a)
+              fb'     = fmap (idsucc d) (idfloor d b)
+              fc'     = fmap (idsucc d) (idfloor d c)
+              Just fa = fa'
+              Just fb = fb'
+              Just fc = fc'
+          in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
+            ((fa `compare` fb) == GT)
+              &&
+            ((fb `compare` fc) == GT)
+              &&
+            ((fa `compare` fc) == GT)
+
   describe "idpred" $ do
+
     it "returns an element strictly smaller" $ property $
         \((d::dim), i) ->
         let norm   = idfloor d i
             Just v = norm
         in isJust norm ==> fmap (`compare` v) (idpred d v) == Just LT
+
+    it "application preserves ordering" $ property $
+        \((d::dim), (a,b,c)) ->
+          let fa'     = fmap (idpred d) (idfloor d a)
+              fb'     = fmap (idpred d) (idfloor d b)
+              fc'     = fmap (idpred d) (idfloor d c)
+              Just fa = fa'
+              Just fb = fb'
+              Just fc = fc'
+          in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
+            ((fa `compare` fb) == LT)
+              &&
+            ((fb `compare` fc) == LT)
+              &&
+            ((fa `compare` fc) == LT)
 
   describe "idfloor" $ do
     it "returns an element belonging to set" $ property $
