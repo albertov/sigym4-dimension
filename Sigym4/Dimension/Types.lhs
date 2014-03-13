@@ -260,21 +260,21 @@ inferior y superior, ambas cerradas.
 > --   The implementation of 'dsucc', 'dpred', 'dceiling' and 'dfloor' from
 > --   'Dimension a' must return 'Nothing' when out of bounds
 > class Dimension d => BoundedDimension d where
->     dfirst :: d -> Dim d (Quantized (DimensionIx d))
->     dlast :: d -> Dim d (Quantized (DimensionIx d))
+>     dfirst :: d -> Dim d (Maybe ((Quantized (DimensionIx d))))
+>     dlast :: d -> Dim d (Maybe (Quantized (DimensionIx d)))
 >     {-# MINIMAL dfirst, dlast #-}
 >
 >     denum :: d -> Dim d [Quantized (DimensionIx d)]
->     denum d = dfirst d >>= denumUp d . unQ
+>     denum d = dfirst d >>= maybe (return []) (denumUp d . unQ)
 >
 >     denumr   :: d -> Dim d [Quantized (DimensionIx d)]
->     denumr d = dlast d >>= denumDown d . unQ
+>     denumr d = dlast d >>= maybe (return []) (denumDown d . unQ)
 
 
 Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
 
 > idfirst, idlast :: (BoundedDimension d, Dependent d ~ ())
->                 => d -> Quantized (DimensionIx d)
+>                 => d -> Maybe (Quantized (DimensionIx d))
 > idfirst = irunDim . dfirst
 > idlast = irunDim . dlast
 
@@ -297,8 +297,8 @@ indexar datos estáticos.
 >     dceiling _ _ = yieldQuant ()
 > 
 > instance BoundedDimension () where
->     dfirst _ = return qZ
->     dlast  _ = return qZ
+>     dfirst _ = yieldQuant ()
+>     dlast  _ = yieldQuant ()
 > 
 
 También definimos una instancia para usar cualquier tipo numérico como
@@ -362,6 +362,9 @@ sistema de tipos requiriendo `BoundedDimension` en la variable de tipo `a`.
 Ésto es así porque si no sería imposible determinar cuando se ha terminado de
 iterar las dimensiones interiores para pasar a la exterior.
 
+> maxTryIfNoBound :: Int
+> maxTryIfNoBound = 1000
+
 > instance (BoundedDimension a, Dimension b, Dependent a ~ b)
 >   => Dimension (a :~ b) where
 >     type DimensionIx (a :~ b) = DimensionIx a :* DimensionIx b
@@ -371,33 +374,43 @@ iterar las dimensiones interiores para pasar a la exterior.
 >      eb <- withDep $ delem db b
 >      return $ if eb then runDim (delem da a) (Quant b) else False
 > 
->     dpred (da :~ db) (Quant (a :* b))
->       = maybe (withPred db (Quant b) (yieldWithLast da))
->               (\a' -> yieldQuant (unQ a' :* b))
->               (runDim (dpred da (Quant a)) (Quant b))
+>     dpred (da :~ db) (Quant (a :* b)) = loop maxTryIfNoBound (Quant b)
+>       where
+>         loop n b'
+>           | n > 0 = maybe (withPred db b' (try (n-1)))
+>                      (\a' -> combine a' b')
+>                      (runDim (dpred da (Quant a)) b')
+>           | otherwise = stopIteration
+>         try n p = maybe (loop n p) (`combine` p) (runDim (dlast da) p)
 >
->     dsucc (da :~ db) (Quant (a :* b))
->       = maybe (withSucc db (Quant b) (yieldWithFirst da))
->               (\a' -> yieldQuant (unQ a' :* b))
->               (runDim (dsucc da (Quant a)) (Quant b))
-> 
+>     dsucc (da :~ db) (Quant (a :* b)) = loop maxTryIfNoBound (Quant b)
+>       where
+>         loop n b'
+>           | n > 0 = maybe (withSucc db b' (try (n-1)))
+>                      (\a' -> combine a' b')
+>                      (runDim (dsucc da (Quant a)) b')
+>           | otherwise = stopIteration
+>         try n p = maybe (loop n p) (`combine` p) (runDim (dfirst da) p)
+>
 >     dfloor (da :~ db) (a :* b)
->       = withDep (delem db b) >>= \isElemOfB ->
->         if isElemOfB then
->           maybe (withPred db (Quant b) (yieldWithLast da))
->                 (\a' -> yieldQuant (unQ a' :* b))
->                 (runDim (dfloor da a) (Quant b))
->         else withDep (dfloor db b)
->          >>= maybe stopIteration (yieldWithLast da)
+>       = withDep (dfloor db b) >>= maybe stopIteration (loop maxTryIfNoBound)
+>       where
+>         loop n b'
+>           | n > 0 = maybe (withPred db b' (try (n-1)))
+>                      (\a' -> combine a' b')
+>                      (runDim (dfloor da a) b')
+>           | otherwise = stopIteration
+>         try n p = maybe (loop n p) (`combine` p) (runDim (dlast da) p)
 >
 >     dceiling (da :~ db) (a :* b)
->       = withDep (delem db b) >>= \isElemOfB ->
->         if isElemOfB then
->           maybe (withSucc db (Quant b) (yieldWithFirst da))
->                 (\a' -> yieldQuant (unQ a' :* b))
->                 (runDim (dceiling da a) (Quant b))
->         else withDep (dceiling db b)
->          >>= maybe stopIteration (yieldWithFirst da)
+>       = withDep (dceiling db b) >>= maybe stopIteration (loop maxTryIfNoBound)
+>       where
+>         loop n b'
+>           | n > 0 = maybe (withSucc db b' (try (n-1)))
+>                      (\a' -> combine a' b')
+>                      (runDim (dceiling da a) b')
+>           | otherwise = stopIteration
+>         try n p = maybe (loop n p) (`combine` p) (runDim (dfirst da) p)
 
 
 Las utilidades que acabamos de utilizar.
@@ -407,15 +420,12 @@ Las utilidades que acabamos de utilizar.
 > withSucc d v f = withDep (dsucc d v) >>= maybe stopIteration f
 > withPred d v f = withDep (dpred d v) >>= maybe stopIteration f
 >
-> yieldWithLast da b
->   = yieldQuant (unQ (runDim (dlast da) b) :* unQ b)
-> yieldWithFirst da b
->   = yieldQuant (unQ (runDim (dfirst da) b) :* unQ b)
->
 > iyieldWithLast da b
->   = yieldQuant (unQ (irunDim (dlast da)) :* unQ b)
+>   = maybe stopIteration (`combine` b) (irunDim (dlast da))
 > iyieldWithFirst da b
->   = yieldQuant (unQ (irunDim (dfirst da)) :* unQ b)
+>   = maybe stopIteration (`combine` b) (irunDim (dfirst da))
+>
+> combine a b = yieldQuant (unQ a :* unQ b)
 
 
 Definimos de manera similar la instancia de `Dimension` para los productos
@@ -466,13 +476,17 @@ Los productos `:~` de dos `BoundedDimension` es a su vez una `BoundedDimension`
 >   where
 >     dfirst (a :~ b) = do
 >       fb <- withDep (dfirst b)
->       let fa = runDim (dfirst a) fb
->       return $ Quant (unQ fa :* unQ fb)
+>       let fa = maybe Nothing (runDim (dfirst a)) fb
+>       case (fa,fb) of
+>         (Just fa', Just fb') -> combine fa' fb'
+>         _                    -> stopIteration
 >
 >     dlast  (a :~ b) = do
->       lb <- withDep (dlast b)
->       let la = runDim (dlast a) lb
->       return $ Quant (unQ la :* unQ lb)
+>       fb <- withDep (dlast b)
+>       let fa = maybe Nothing (runDim (dlast a)) fb
+>       case (fa,fb) of
+>         (Just fa', Just fb') -> combine fa' fb'
+>         _                    -> stopIteration
 
 Los productos `:+` también.
 
@@ -482,9 +496,13 @@ Los productos `:+` también.
 >     dfirst (a :* b) = do
 >       fb <- withDep (dfirst b)
 >       let fa = irunDim (dfirst a)
->       return $ Quant (unQ fa :* unQ fb)
+>       case (fa,fb) of
+>         (Just fa', Just fb') -> combine fa' fb'
+>         _                    -> stopIteration
 >
 >     dlast  (a :* b) = do
->       lb <- withDep (dlast b)
->       let la = irunDim (dlast a)
->       return $ Quant (unQ la :* unQ lb)
+>       fb <- withDep (dlast b)
+>       let fa = irunDim (dlast a)
+>       case (fa,fb) of
+>         (Just fa', Just fb') -> combine fa' fb'
+>         _                    -> stopIteration

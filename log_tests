@@ -1,0 +1,8 @@
+1) Sigym4.Dimension.CronSchedule.idelem behaves like model
+Falsifiable (after 144 tests): 
+(CronSchedule * 8-19 7-17 * */7,2204-02-12 09:24:22 UTC)
+
+Randomized with seed 4611685480021524670
+
+Finished in 41.9429 seconds
+72 examples, 1 failure

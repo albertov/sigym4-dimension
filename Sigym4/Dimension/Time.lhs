@@ -257,8 +257,8 @@ finita (`BoundedDimension`).
 >           (x:_) -> yieldQuant x
 > 
 > instance BoundedDimension Horizons where
->     dfirst (Horizons ds) = quant $ head ds
->     dlast  (Horizons ds) = quant $ last ds
+>     dfirst (Horizons ds) = yieldQuant $ head ds
+>     dlast  (Horizons ds) = yieldQuant $ last ds
 >     -- denum  (Horizons ds) = return (map Quant ds)
 
 Horizontes dinámicos
@@ -298,7 +298,9 @@ ascendentemente!
 >           (x:_) -> yieldQuant x
 > 
 > instance BoundedDimension DynHorizons where
->     dfirst f = getHs f >>= \ds -> quant $ head ds
->     dlast f  = getHs f >>= \ds -> quant $ last ds
+>     dfirst f = getHs f >>= \ds -> if null ds then stopIteration
+>                                              else yieldQuant $ head ds
+>     dlast f  = getHs f >>= \ds -> if null ds then stopIteration
+>                                              else yieldQuant $ last ds
 >
 > getHs f = getDep >>= return . f . unQ

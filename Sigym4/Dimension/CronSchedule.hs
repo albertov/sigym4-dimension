@@ -15,7 +15,7 @@ import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
 import Data.Time.Calendar          (toGregorian, fromGregorian, isLeapYear)
--- import Data.Time.Calendar.WeekDate (toWeekDate)
+import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
 
 import Sigym4.Dimension.Types
@@ -44,18 +44,15 @@ instance Dimension BCronField where
     type Dependent BCronField = ()
 
     -- delem
-    delem (CF Star lo hi) m
-      = return $ lo<=m && m<=hi
-    delem (CF (SpecificField i) _ _) m
-      = return $ m==i
-    delem (CF (RangeField a b) lo hi) m
-      = return $ max lo a <= m && min hi b >= m
+    delem (CF Star lo hi) m = return $ lo<=m && m<=hi
+    delem (CF (SpecificField i) _ _) m = return $ m==i
+    delem (CF (RangeField a b) lo hi) m = return $ a<=m && m<=b
     delem (CF (ListField fs) lo hi) m
       = return $ any (\f -> idelem (CF f lo hi) m) fs
     delem (CF (StepField Star s) lo hi) m
       = return $ lo<=m && m<=hi && m `mod` s == 0
     delem (CF (StepField (RangeField a b) s) lo hi) m
-      = return $ max lo a <= m && min hi b >= m && m `mod` s == 0
+      = return $ a<=m && m<=b && m `mod` s == 0
     delem (CF f@(StepField _ _) _ _) _ 
       = error $ "delem(BCronField): Unimplemented " ++ show f
 
@@ -67,6 +64,7 @@ instance Dimension BCronField where
 
     dpred (CF (SpecificField _) _ _) _ = stopIteration
 
+    -- FIXME
     dpred (CF (RangeField a _) lo _) m
       | lo'<=m'    = yieldQuant m'
       | otherwise  = stopIteration
@@ -79,6 +77,7 @@ instance Dimension BCronField where
       | otherwise = stopIteration
       where m' = (unQ m `modFloor` s) - s
 
+    -- FIXME
     dpred (CF (StepField (RangeField a _) s) lo _) m
       | m'>= lo'   = yieldQuant m'
       | otherwise  = stopIteration
@@ -104,6 +103,7 @@ instance Dimension BCronField where
 
     dsucc (CF (SpecificField _) _ _) _ = stopIteration
 
+    -- FIXME
     dsucc (CF (RangeField _ b) _ hi) m
       | m'<=hi'     = yieldQuant m'
       | otherwise   = stopIteration
@@ -115,6 +115,7 @@ instance Dimension BCronField where
       | otherwise = stopIteration
       where m' = (unQ m `modCeil` s) + s
 
+    -- FIXME
     dsucc (CF (StepField (RangeField _ b) s) _ hi) m
       | m'<= hi'   = yieldQuant m'
       | otherwise  = stopIteration
@@ -137,21 +138,20 @@ instance Dimension BCronField where
       | otherwise = stopIteration
 
     dfloor (CF (SpecificField i) lo hi) m
-      | m >= max lo i = yieldQuant $ min hi i
-      | otherwise     = stopIteration
+      | i<=m, lo<=i, i<=hi = yieldQuant i
+      | otherwise          = stopIteration
 
+    -- FIXME
     dfloor (CF (RangeField a b) lo hi) m
-      | m   >= lo' = yieldQuant $ min hi' m
-      | otherwise  = stopIteration
-      where
-        hi' = min hi b
-        lo' = max lo a
+      | a<=m      = yieldQuant $ min b m
+      | otherwise = stopIteration
 
     dfloor (CF (StepField Star s) lo hi) m
       | m'>= lo   = yieldQuant $ min hi m'
       | otherwise = stopIteration
       where m' = m `modFloor` s
 
+    -- FIXME
     dfloor (CF (StepField (RangeField a b) s) lo hi) m
       | m'>= lo'  = yieldQuant $ min hi' m'
       | otherwise = stopIteration
@@ -175,11 +175,12 @@ instance Dimension BCronField where
       | otherwise = stopIteration
 
     dceiling (CF (SpecificField i) lo hi) m
-      | m<=min hi i = yieldQuant $ max lo i
-      | otherwise   = stopIteration
+      | m<=i, lo<=i, i<=hi = yieldQuant i
+      | otherwise          = stopIteration
 
+    -- FIXME
     dceiling (CF (RangeField a b) lo hi) m
-      | m<=hi'    = yieldQuant $ max lo' m
+      | m<=b      = yieldQuant $ max a m
       | otherwise = stopIteration
       where
         lo' = max lo a
@@ -190,6 +191,7 @@ instance Dimension BCronField where
       | otherwise = stopIteration
       where m' = m `modCeil` s
 
+    -- FIXME
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
       | m'<=hi'   = yieldQuant $ max lo' m'
       | otherwise = stopIteration
@@ -209,27 +211,41 @@ instance Dimension BCronField where
 
 
 instance BoundedDimension BCronField where
-    dfirst (CF Star lo _ ) = quant lo
-    dfirst (CF (SpecificField i) lo _) = quant $ max lo i
-    dfirst (CF (RangeField a _) lo _) = quant $ max lo a
+    dfirst (CF Star lo _ ) = yieldQuant lo
+    dfirst (CF (SpecificField i) lo hi)
+      | lo<=i,i<=hi = yieldQuant i
+      | otherwise   = stopIteration
+    dfirst (CF (RangeField a _) lo _)
+      | a>=lo     = yieldQuant a
+      | otherwise = stopIteration
     dfirst (CF (ListField fs) lo hi)
-      = return $ minimum $ map (\f -> idfirst (CF f lo hi)) fs
+      = case catMaybes . map (\f -> idfirst (CF f lo hi)) $ fs of
+          [] -> stopIteration
+          ls -> yieldQuant . unQ . minimum $ ls
     dfirst (CF (StepField Star s) lo _)
-      = quant (lo `modCeil` s)
+      = yieldQuant (lo `modCeil` s)
     dfirst (CF (StepField (RangeField a _) s) lo _)
-      = quant (max lo a `modCeil` s)
+      | a>=lo     = yieldQuant (a `modFloor` s)
+      | otherwise = stopIteration
     dfirst (CF f@(StepField _ _) _ _)
       = error $ "dfirst(CronField): Unimplemented " ++ show f
 
-    dlast (CF Star _ hi) = quant hi
-    dlast (CF (SpecificField i) _ hi) = quant $ min hi i
-    dlast (CF (RangeField _ b) _ hi) = quant $ min hi b
+    dlast (CF Star _ hi) = yieldQuant hi
+    dlast (CF (SpecificField i) lo hi)
+      | lo<=i,i<=hi = yieldQuant i
+      | otherwise   = stopIteration
+    dlast (CF (RangeField _ b) _ hi)
+      | b<=hi     = yieldQuant b
+      | otherwise = stopIteration
     dlast (CF (ListField fs) lo hi)
-      = return $ maximum $ map (\f -> idfirst (CF f lo hi)) fs
+      = case catMaybes . map (\f -> idlast (CF f lo hi)) $ fs of
+          [] -> stopIteration
+          ls -> yieldQuant . unQ . maximum $ ls
     dlast (CF (StepField Star s) _ hi)
-      = quant (hi `modFloor` s)
+      = yieldQuant (hi `modFloor` s)
     dlast  (CF (StepField (RangeField _ b) s) _  hi)
-      = quant (min hi b `modFloor` s)
+      | b<=hi     = yieldQuant (b `modFloor` s)
+      | otherwise = stopIteration
     dlast  (CF f@(StepField _ _) _ _)
       = error $ "dlast(CronField): Unimplemented " ++ show f
 
@@ -240,30 +256,88 @@ modCeil  a m
   | otherwise = a + (m-md)
   where md = a `mod` m
 
-instance Dimension DayOfMonthSpec where
-    type DimensionIx DayOfMonthSpec = Int
-    type Dependent   DayOfMonthSpec = BCronField :* Infinite Int
-    delem    = withDynamicDom idelem
-    dpred    = withDynamicDom idpred
-    dsucc    = withDynamicDom idsucc
-    dfloor   = withDynamicDom idfloor
-    dceiling = withDynamicDom idceiling
 
-withDynamicDom f (DaysOfMonth cs) i
-  = getDep >>= \d ->
-    let m:*y = unQ d
-        dpm  = daysPerMonth y m
-    in return $ f (CF cs 1 dpm) i
+data DayOfMonthDim = DomDim CronField CronField deriving Show
 
-instance BoundedDimension DayOfMonthSpec where
+instance Dimension DayOfMonthDim where
+    type DimensionIx DayOfMonthDim = Int
+    type Dependent   DayOfMonthDim = BCronField :* Infinite Int
+    delem (DomDim doms dows) i
+      = getDowDpm i >>= \(dow,dpm) -> return $ idelem (CF doms 1 dpm) i
+                                   && idelem (CF dows 1 7) dow
+
+    dpred (DomDim doms dows) i = do
+      (_,dpm) <- getDowDpm (unQ i)
+      let cfDoms = CF doms 1 dpm
+          cfDows = CF dows 1 7
+          loop v = maybe stopIteration
+                   (\j -> getDowDpm (unQ j) >>= \(dow,_) ->
+                          if cfDows `idelem` dow
+                          then return (Just j)
+                          else loop j)
+                   (idpred cfDoms v)
+
+      loop i
+
+    dsucc (DomDim doms dows) i = do
+      (_,dpm) <- getDowDpm (unQ i)
+      let cfDoms = CF doms 1 dpm
+          cfDows = CF dows 1 7
+          loop v = maybe stopIteration
+                   (\j -> getDowDpm (unQ j) >>= \(dow,_) ->
+                          if cfDows `idelem` dow
+                          then return (Just j)
+                          else loop j)
+                   (idsucc cfDoms v)
+
+      loop i
+
+    dfloor (DomDim doms dows) i = do
+      (_,dpm) <- getDowDpm i
+      let cfDoms = CF doms 1 dpm
+          cfDows = CF dows 1 7
+          loop v = maybe stopIteration
+                   (\j -> getDowDpm (unQ j) >>= \(dow,_) ->
+                          if cfDows `idelem` dow
+                          then return (Just j)
+                          else loop $ unQ j - 1)
+                   (idfloor cfDoms v)
+
+      loop i
+
+    dceiling (DomDim doms dows) i = do
+      (_,dpm) <- getDowDpm i
+      let cfDoms = CF doms 1 dpm
+          cfDows = CF dows 1 7
+          loop v = maybe stopIteration
+                   (\j -> getDowDpm (unQ j) >>= \(dow,_) ->
+                          if cfDows `idelem` dow
+                          then return (Just j)
+                          else loop $ unQ j + 1)
+                   (idceiling cfDoms v)
+
+      loop i
+
+getDowDpm dom = getDep >>= \d ->
+  let m :* y    = unQ d
+      dpm       = daysPerMonth y m
+      (_,_,dow) = toWeekDate $ (fromGregorian (fromIntegral y) m dom)
+  in return (dow, dpm)
+
+instance BoundedDimension DayOfMonthDim where
     dfirst = withDynamicDom0 idfirst
     dlast  = withDynamicDom0 idlast
 
-withDynamicDom0 f (DaysOfMonth cs)
-  = getDep >>= \d ->
-    let m:*y = unQ d
-        dpm  = daysPerMonth y m
-    in return $ f (CF cs 1 dpm)
+withDynamicDom0 f (DomDim doms dows) = getDep >>= \d ->
+    let m:*y      = unQ d
+        dpm       = daysPerMonth y m
+        wDay day  = dow
+          where (_,_,dow) = toWeekDate $ (fromGregorian (fromIntegral y) m day')
+                day'      = unQ day
+    in return $
+       case f (CF doms 1 dpm) of
+         Just j |(CF dows 1 7) `idelem` wDay j -> Just j
+         _                                     -> Nothing
 
 
 daysPerMonth :: Int -> Int -> Int
@@ -277,7 +351,7 @@ daysPerMonth yr mth
 type TimeIx = DimensionIx CronScheduleDim
 type CronScheduleDim = BCronField
                     :* BCronField
-                    :* DayOfMonthSpec 
+                    :* DayOfMonthDim
                     :~ (BCronField :* Infinite Int)
 
 ndimIxToTime :: Quantized TimeIx -> Quantized UTCTime
@@ -295,12 +369,13 @@ timeToDimIx :: UTCTime -> TimeIx
 timeToDimIx UTCTime {utctDay = uDay, utctDayTime = uTime }
   = mn :* hr :* dom :* (mth :* fromIntegral yr)
   where (yr, mth, dom) = toGregorian uDay
-        --(_, _, dow)    = toWeekDate uDay
         TimeOfDay { todHour = hr, todMin  = mn} = timeToTimeOfDay uTime
 
 scheduleToDim :: CronSchedule -> CronScheduleDim
-scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* doms :~ (CF mths 1 12 :* Inf)
+scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* domd :~ (CF mths 1 12 :* Inf)
   where CronSchedule { minute     = Minutes mins
                      , hour       = Hours hrs
-                     , dayOfMonth = doms
+                     , dayOfMonth = DaysOfMonth doms
+                     , dayOfWeek  = DaysOfWeek dows
                      , month      = Months mths} = cs
+        domd = DomDim doms dows

@@ -10,6 +10,7 @@ import Control.Applicative
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Data.Time.Calendar
+import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock
 import Data.List as L
 import Data.Maybe (isJust, fromJust)
@@ -27,8 +28,11 @@ import Sigym4.Dimension.Time (Schedule(Schedule))
 main :: IO ()
 main = hspec spec
 
+sampleLen :: Int
+sampleLen = 500
+
 takeSample :: [a] -> [a]
-takeSample = take 500
+takeSample = take sampleLen
 
 spec :: Spec
 spec = do
@@ -48,7 +52,30 @@ spec = do
       it "behaves like model" $ property $
         \(s, t) -> s `idelem` t == s `scheduleMatches` t
 
+    describe "idfloor" $ do
+      it "does not crash on impossible schedule" $ do
+        let sched = "0 0 31 2 *" :: CronSchedule
+        idfloor sched (datetime 2012 3 1 0 0) `shouldBe` Nothing
+
     describe "leap years" $ do
+      it "returns only feb 29" $ do
+        let sched  = "0 0 29 2 *" :: CronSchedule
+            Just t = idfloor sched (datetime 2012 3 1 0 0)
+            Just s = idsucc sched t
+        unQ s `shouldBe` datetime 2012 2 29 0 0
+        fmap unQ (idsucc sched s) `shouldBe` Just (datetime 2016 2 29 0 0)
+        fmap unQ (idpred sched s) `shouldBe` Just (datetime 2008 2 29 0 0)
+
+      it "returns only feb 29 on monday" $ do
+        let sched     = "0 0 29 2 1" :: CronSchedule
+            matches (UTCTime d _) = let (_,m,dom) = toGregorian d
+                                        (_,_,dow) = toWeekDate d
+                                    in dow == 1 && m==2 && dom==29
+            ts = takeSample . map unQ . idenumUp sched $ datetime 2012 3 1 0 0
+                              
+        length ts `shouldBe` sampleLen
+        all  (idelem sched) ts `shouldBe` True
+        all  matches ts `shouldBe` True
 
       describe "idsucc" $ do
         it "returns day 29" $ do
@@ -290,12 +317,12 @@ instance Arbitrary CronSchedule where
                                     <*> arbitrary
                                     <*> arbitrary
                                     <*> arbitrary
-                                    <*> pure (DaysOfWeek Star) --TODO
+                                    <*> arbitrary
 
 instance Arbitrary DayOfWeekSpec where
-    arbitrary = DaysOfWeek <$> arbitraryCronField (0,7)
+    arbitrary = DaysOfWeek <$> arbitraryCronField (1,7)
 instance Arbitrary DayOfMonthSpec where
-    arbitrary = DaysOfMonth <$> arbitraryCronField (1,28)
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,31)
 instance Arbitrary MonthSpec where
     arbitrary = Months <$> arbitraryCronField (1,12)
 instance Arbitrary MinuteSpec where
