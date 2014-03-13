@@ -12,7 +12,7 @@ import Test.Hspec.QuickCheck
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.List as L
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, fromJust)
 import Data.Either (isRight)
 import Data.String (fromString)
 import Data.Attoparsec.Text (parseOnly)
@@ -35,6 +35,8 @@ spec = do
 
   dimensionSpec "Schedule ObservationTime"
                 (Proxy :: Proxy (Schedule ObservationTime))
+
+  dimensionSpec "Horizons" (Proxy :: Proxy Horizons)
 
   dimensionSpec "Horizons :* Schedule RunTime"
                 (Proxy :: Proxy (Horizons :* Schedule RunTime))
@@ -82,18 +84,19 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idsucc" $ do
     it "returns an element strictly greater" $ property $
         \((d::dim), i) ->
-        let norm   = idfloor d i
-            Just v = norm
-        in isJust norm ==> fmap (`compare` v) (idsucc d v) == Just GT
+        let c      = idceiling d i
+            f      = idsucc d (fromJust c)
+            Just v = f
+        in isJust c && isJust f ==> unQ v `compare` i == GT
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
-          let fa'     = idfloor d a
-              fb'     = idfloor d b
-              fc'     = idfloor d c
-              fa''    = fmap (idsucc d) fa'
-              fb''    = fmap (idsucc d) fb'
-              fc''    = fmap (idsucc d) fc'
+          let fa'     = idceiling d a
+              fb'     = idceiling d b
+              fc'     = idceiling d c
+              fa''    = (idsucc d) =<< fa'
+              fb''    = (idsucc d) =<< fb'
+              fc''    = (idsucc d) =<< fc'
               Just fa = fa''
               Just fb = fb''
               Just fc = fc''
@@ -109,18 +112,19 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns an element strictly smaller" $ property $
         \((d::dim), i) ->
-        let norm   = idfloor d i
-            Just v = norm
-        in isJust norm ==> fmap (`compare` v) (idpred d v) == Just LT
+        let c      = idfloor d i
+            f      = idpred d (fromJust c)
+            Just v = f
+        in isJust c && isJust f ==> unQ v `compare` i == LT
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
           let fa'     = idfloor d a
               fb'     = idfloor d b
               fc'     = idfloor d c
-              fa''    = fmap (idpred d) fa'
-              fb''    = fmap (idpred d) fb'
-              fc''    = fmap (idpred d) fc'
+              fa''    = (idpred d) =<< fa'
+              fb''    = (idpred d) =<< fb'
+              fc''    = (idpred d) =<< fc'
               Just fa = fa''
               Just fb = fb''
               Just fc = fc''
@@ -136,12 +140,13 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idfloor" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((idelem d) . unQ) (idfloor d i) == Just True
+        let c = idfloor d i
+        in isJust c ==> idelem d (unQ (fromJust c))
 
-    it "returns an element smaller or EQ" $ property $
+    it "returns an element LT or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQ) (idfloor d i)
-              == Just True
+        let c = idfloor d i
+        in isJust c ==> (unQ (fromJust c) `compare` i) `elem` [LT,EQ]
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
@@ -161,12 +166,13 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idceiling" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((idelem d) . unQ) (idceiling d i) == Just True
+        let c = idceiling d i
+        in isJust c ==> idelem d (unQ (fromJust c))
 
-    it "returns an element greater or EQ" $ property $
+    it "returns an element GT or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQ) (idceiling d i)
-              == Just True
+        let c = idceiling d i
+        in isJust c ==> (unQ (fromJust c) `compare` i) `elem` [GT,EQ]
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
@@ -255,7 +261,8 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (a :~ b) where
     arbitrary = (:~) <$> arbitrary <*> arbitrary
 
 instance Arbitrary Horizons where
-    arbitrary = fromList <$> listOf1 arbitrary
+    arbitrary = do n <- choose (2,100) 
+                   fromList <$> vectorOf n arbitrary
 
 instance Arbitrary Horizon where
     arbitrary = oneof [ Minute <$> choose (-10000,10000)
