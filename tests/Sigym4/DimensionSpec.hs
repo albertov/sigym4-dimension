@@ -88,18 +88,22 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
-          let fa'     = fmap (idsucc d) (idfloor d a)
-              fb'     = fmap (idsucc d) (idfloor d b)
-              fc'     = fmap (idsucc d) (idfloor d c)
-              Just fa = fa'
-              Just fb = fb'
-              Just fc = fc'
-          in a > b && b > c && isJust fa' && isJust fb' && isJust fc'  ==>
-            ((fa `compare` fb) == GT)
-              &&
-            ((fb `compare` fc) == GT)
-              &&
-            ((fa `compare` fc) == GT)
+          let fa'     = idfloor d a
+              fb'     = idfloor d b
+              fc'     = idfloor d c
+              fa''    = fmap (idsucc d) fa'
+              fb''    = fmap (idsucc d) fb'
+              fc''    = fmap (idsucc d) fc'
+              Just fa = fa''
+              Just fb = fb''
+              Just fc = fc''
+          in fa' > fb' && fb' > fc' && isJust fa'' && isJust fb'' && isJust fc''
+            ==>
+              ((fa `compare` fb) == GT)
+                &&
+              ((fb `compare` fc) == GT)
+                &&
+              ((fa `compare` fc) == GT)
 
   describe "idpred" $ do
 
@@ -111,18 +115,23 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "application preserves ordering" $ property $
         \((d::dim), (a,b,c)) ->
-          let fa'     = fmap (idpred d) (idfloor d a)
-              fb'     = fmap (idpred d) (idfloor d b)
-              fc'     = fmap (idpred d) (idfloor d c)
-              Just fa = fa'
-              Just fb = fb'
-              Just fc = fc'
-          in a < b && b < c && isJust fa' && isJust fb' && isJust fc'  ==>
-            ((fa `compare` fb) == LT)
-              &&
-            ((fb `compare` fc) == LT)
-              &&
-            ((fa `compare` fc) == LT)
+          let fa'     = idfloor d a
+              fb'     = idfloor d b
+              fc'     = idfloor d c
+              fa''    = fmap (idpred d) fa'
+              fb''    = fmap (idpred d) fb'
+              fc''    = fmap (idpred d) fc'
+              Just fa = fa''
+              Just fb = fb''
+              Just fc = fc''
+          in fa' < fb' && fb' < fc' && isJust fa'' && isJust fb'' && isJust fc''
+            ==>
+              ((fa `compare` fb) == LT)
+                &&
+              ((fb `compare` fc) == LT)
+                &&
+              ((fa `compare` fc) == LT)
+
 
   describe "idfloor" $ do
     it "returns an element belonging to set" $ property $
