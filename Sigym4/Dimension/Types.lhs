@@ -21,7 +21,8 @@ se utilizan familias de tipos para asociar el tipo de índice con cada
 dimensión. Para ello necesitamos habilitar algunas extensiones de GHC
 porque no se pueden expresar con Haskell2010.
 
-> {-# LANGUAGE DeriveDataTypeable
+> {-# LANGUAGE GeneralizedNewtypeDeriving
+>            , DeriveDataTypeable
 >            , DeriveFunctor
 >            , TypeFamilies
 >            , TypeOperators
@@ -65,6 +66,8 @@ Se define el interfaz del módulo...
 ... y se importan las librerías necesarias:
 
 > import Control.Monad.Loops (unfoldrM)
+> import Control.Monad.Reader (Reader, runReader, ask)
+> import Control.Applicative (Applicative)
 > import Data.Typeable (Typeable)
 
 Dimension
@@ -111,30 +114,57 @@ los tipos sin introducir chequeos en ejecución)
 
 > newtype Quantized a = Quant {unQ :: a}
 >   deriving (Eq, Ord, Show, Functor, Typeable)
+>
 
+Definimos un alias para referirnos al tipo de índice cuantizado de la
+dimensión dependiente.
+
+> type DDimensionIx d = Quantized (DimensionIx (Dependent d))
+
+
+Definimos una mónada lectora para envolver el índice de la dimensión dependiente
+para no tener que pasarlo explicitamente como parámetro y evitar que los
+clientes de la librería creen valores cuantizados fuera de las instancias
+de `Dimension`
+
+> newtype Dim d a = Dim {unDim :: Reader (DDimensionIx d) a}
+>   deriving (Functor, Applicative, Monad)
+>
+> -- | Wraps a value in 'Maybe Quantized' and lifts it to the 'Dim' monad
+> --   Signals that there is a valid next value.
+> --   Used to implement 'Dimension' instances.
 > yieldQuant :: a -> Dim d (Maybe (Quantized a))
 > yieldQuant = return . Just . Quant
 >
+> -- | Wraps a Nothing in 'Maybe Quantized' and lifts it to the 'Dim' monad
+> --   Signals that there are no more valid values.
+> --   Used to implement 'Dimension' instances.
 > stopIteration :: Dim d (Maybe a)
 > stopIteration = return Nothing
-
-> data Dim d a = Dim {runDim :: DDimensionIx d -> a}
-
-> instance Functor (Dim d) where
->    fmap f m = Dim $ \r -> f (runDim m r)
-
-> instance Monad (Dim d) where
->    return a = Dim $ \_ -> a
->    m >>= k  = Dim $ \r -> runDim (k (runDim m r)) r
-
-> getDep :: Dim d (DDimensionIx d)
-> getDep = Dim id
-
+>
+> -- | Wraps a value in 'Quantized' and lifts it to the 'Dim' monad
 > quant :: a -> Dim d (Quantized a)
 > quant = return . Quant
+>
+> -- | Asks for the 'DimensionIx' of the dependent 'Dimension' from the
+> --   environment
+> getDep :: Dim d (DDimensionIx d)
+> getDep = Dim ask
+>
+> -- | Computes a 'Dim d a' value given the dependent dimension index
+> --   and extracts it from it's monadic wrapper.
+> runDim :: Dim d a -> DDimensionIx d -> a
+> runDim = runReader . unDim
+>
+> -- | Same as 'runDim' but only for independent dimensions (ie: those that
+> --   declare '()' as their 'Dependent')
+> irunDim :: (Dimension d, Dependent d ~ ()) => Dim d a -> a
+> irunDim d = runDim d qZ
 
+> qZ :: Quantized ()
+> qZ = Quant ()
 
-> type DDimensionIx d = Quantized (DimensionIx (Dependent d))
+Definimos la clase de tipos que pueden usarse como una dimensión.
 
 > -- | A 'Dimension' is a possibly infinite ordered set of associated
 > --   'DimensionIx's
@@ -193,15 +223,7 @@ los tipos sin introducir chequeos en ejecución)
 >       where go Nothing  = stopIteration
 >             go (Just i) = fmap (\next -> Just (i,next)) (dpred d i)
 
-> irunDim :: (Dimension d, Dependent d ~ ())
->        => Dim d a -> a
-> irunDim d = runDim d qZ
->
-
 Definimos atajos para dimensiones independientes (de tipo Dependent ())
-
-> qZ :: Quantized ()
-> qZ = Quant ()
 
 > idelem :: (Dimension d, Dependent d ~ ())
 >   => d -> DimensionIx d -> Bool
@@ -274,8 +296,11 @@ indexar datos estáticos.
 >     dlast  _ = return qZ
 > 
 
-> data Infinite a = Inf deriving Show
+También definimos una instancia para usar cualquier tipo numérico como
+dimensión "infinita".
 
+> data Infinite a = Inf deriving Show
+>
 > instance (Show a, Num a, Ord a, Bounded a) => Dimension (Infinite a) where
 >     type DimensionIx (Infinite a) = a
 >     type Dependent   (Infinite a) = ()
@@ -396,11 +421,11 @@ pasamos el índice de la dimensión exterior a la interior (usando `irunDim`).
 >   => Dimension (a :* b) where
 >     type DimensionIx (a :* b) = DimensionIx a :* DimensionIx b
 >     type Dependent (a :* b)   = Dependent b
-> 
+>
 >     delem (da :* db) (a :* b) = do
 >      eb <- withDep $ delem db b
 >      return $ if eb then irunDim (delem da a) else False
-> 
+>
 >     dpred (da :* db) (Quant (a :* b))
 >       = maybe (withPred db (Quant b) (iyieldWithLast da))
 >               (\a' -> yieldQuant (unQ a' :* b))
@@ -410,7 +435,7 @@ pasamos el índice de la dimensión exterior a la interior (usando `irunDim`).
 >       = maybe (withSucc db (Quant b) (iyieldWithFirst da))
 >               (\a' -> yieldQuant (unQ a' :* b))
 >               (irunDim (dsucc da (Quant a)))
-> 
+>
 >     dfloor (da :* db) (a :* b)
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then

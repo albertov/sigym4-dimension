@@ -20,6 +20,7 @@ library
   -- other-extensions:    
   build-depends:     base >=4.7 && <5
                    , monad-loops
+                   , mtl
                    , attoparsec
                    , cron
                    , time
