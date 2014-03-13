@@ -52,24 +52,24 @@ spec = do
           let sched  = "0 0 * * *" :: CronSchedule
               Just t = idfloor sched (datetime 2012 2 28 0 0)
               Just s = idsucc sched t
-          unQuant s `shouldBe` datetime 2012 2 29 0 0
+          unQ s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
               Just t = idfloor sched (datetime 2012 2 29 0 0)
               Just s = idsucc sched t
-          unQuant s `shouldBe` datetime 2012 3 1 0 0
+          unQ s `shouldBe` datetime 2012 3 1 0 0
 
       describe "idpred" $ do
         it "returns day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
               Just t = idfloor sched (datetime 2012 3 1 0 0)
               Just s = idpred sched t
-          unQuant s `shouldBe` datetime 2012 2 29 0 0
+          unQ s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
           let sched  = "0 0 * * *" :: CronSchedule
               Just t = idfloor sched (datetime 2012 2 29 0 0)
               Just s = idpred sched t
-          unQuant s `shouldBe` datetime 2012 2 28 0 0
+          unQ s `shouldBe` datetime 2012 2 28 0 0
              
 
 -- | Una especificación que comprueba que se cumplen las propiedades de
@@ -96,11 +96,11 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idfloor" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((idelem d) . unQuant) (idfloor d i) == Just True
+            fmap ((idelem d) . unQ) (idfloor d i) == Just True
 
     it "returns an element smaller or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQuant) (idfloor d i)
+            fmap ((`elem` [LT,EQ]) . (`compare` i) . unQ) (idfloor d i)
               == Just True
 
     it "application preserves ordering" $ property $
@@ -121,11 +121,11 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idceiling" $ do
     it "returns an element belonging to set" $ property $
         \((d::dim), i) ->
-            fmap ((idelem d) . unQuant) (idceiling d i) == Just True
+            fmap ((idelem d) . unQ) (idceiling d i) == Just True
 
     it "returns an element greater or EQ" $ property $
         \((d::dim), i) ->
-            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQuant) (idceiling d i)
+            fmap ((`elem` [GT,EQ]) . (`compare` i) . unQ) (idceiling d i)
               == Just True
 
     it "application preserves ordering" $ property $
@@ -147,7 +147,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((idelem d) . unQuant) $ takeSample $ idenumUp d i
+            all ((idelem d) . unQ) $ takeSample $ idenumUp d i
 
     it "returns sorted elements" $ property $
         \((d::dim), i) ->
@@ -164,7 +164,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            all ((idelem d) . unQuant) $ takeSample $ idenumDown d i
+            all ((idelem d) . unQ) $ takeSample $ idenumDown d i
 
     it "returns reversely sorted elements" $ property $
         \((d::dim), i) ->

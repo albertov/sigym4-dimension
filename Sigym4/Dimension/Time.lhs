@@ -6,6 +6,8 @@ Tiempos
 >            , StandaloneDeriving
 >            , DeriveDataTypeable
 >            , TypeFamilies
+>            , TypeSynonymInstances
+>            , FlexibleInstances
 >            #-}
 > 
 
@@ -16,6 +18,7 @@ Tiempos
 >   , RunTime
 >   , Horizon (..)
 >   , Horizons
+>   , DynHorizons
 >   , Schedule (..)
 > ) where
 
@@ -203,6 +206,9 @@ como ellos como si fuesen números y para poder escribir constantes como número
 > toNominalDiffTime :: Horizon -> NominalDiffTime
 > toNominalDiffTime = fromIntegral . (* 60) . minutes
 
+Horizontes fijos
+-----------------
+
 Definimos un `newtype` para una lista de horizontes sin exportar su constructor.
 Ésto lo hacemos para controlar su construcción en `fromList` la cual verifica
 que no es una lista vacía para que el resto del código lo pueda asumir con
@@ -234,11 +240,11 @@ finita (`BoundedDimension`).
 >     type Dependent   Horizons = ()
 >     delem (Horizons ds) = return . (`elem` ds)
 >     dpred (Horizons ds) d
->       = case dropWhile (>= unQuant d) (reverse ds) of
+>       = case dropWhile (>= unQ d) (reverse ds) of
 >           []    -> stopIteration
 >           (x:_) -> yieldQuant x
 >     dsucc (Horizons ds) d
->       = case dropWhile (<= unQuant d) ds of
+>       = case dropWhile (<= unQ d) ds of
 >           []    -> stopIteration
 >           (x:_) -> yieldQuant x
 >     dfloor (Horizons ds) d
@@ -254,3 +260,45 @@ finita (`BoundedDimension`).
 >     dfirst (Horizons ds) = quant $ head ds
 >     dlast  (Horizons ds) = quant $ last ds
 >     -- denum  (Horizons ds) = return (map Quant ds)
+
+Horizontes dinámicos
+--------------------
+
+Definimos cualquier función de `RunTime` a lista de `Horizon`tes como una
+dimensión dependiente. La utilizamos para los horizontes que dependen de la
+fecha y hora de la pasada.
+
+Ojo, ¡Es muy importante que la función devuelva siempre los horizontes ordenados
+ascendentemente!
+
+> type DynHorizons = RunTime -> [Horizon]
+>
+> instance Show DynHorizons where
+>     show _ = "DynHorizons"
+>
+> instance Dimension DynHorizons where
+>     type DimensionIx DynHorizons = Horizon
+>     type Dependent   DynHorizons = Schedule RunTime
+>     delem f d = getHs (elem d . f)
+>     dpred f d = getHs f >>= \ds ->
+>         case dropWhile (>= unQ d) (reverse ds) of
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dsucc f d = getHs f >>= \ds ->
+>         case dropWhile (<= unQ d) ds of
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dfloor f d = getHs f >>= \ds ->
+>         case dropWhile (> d) (reverse ds) of
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+>     dceiling f d = getHs f >>= \ds ->
+>         case dropWhile (< d) ds of
+>           []    -> stopIteration
+>           (x:_) -> yieldQuant x
+> 
+> instance BoundedDimension DynHorizons where
+>     dfirst f = getHs f >>= \ds -> quant $ head ds
+>     dlast f  = getHs f >>= \ds -> quant $ last ds
+>
+> getHs f = getDep >>= return . f . unQ

@@ -38,7 +38,7 @@ Se define el interfaz del módulo...
 >     Dimension(..)
 >   , BoundedDimension(..)
 >   , Infinite (Inf)
->   , Quantized (unQuant)
+>   , Quantized (unQ)
 >   -- | * Atajos
 >   , idelem
 >   , idfloor
@@ -109,7 +109,7 @@ que un valor cuantizado a ∊ dimA se use en dimB donde dimA y dimB son del
 mismo tipo de dimensión pero distintas (TODO: estudiar como prevenirlo con
 los tipos sin introducir chequeos en ejecución)
 
-> newtype Quantized a = Quant {unQuant :: a}
+> newtype Quantized a = Quant {unQ :: a}
 >   deriving (Eq, Ord, Show, Functor, Typeable)
 
 > yieldQuant :: a -> Dim d (Maybe (Quantized a))
@@ -221,6 +221,7 @@ Definimos atajos para dimensiones independientes (de tipo Dependent ())
 >                      => d -> DimensionIx d -> [Quantized (DimensionIx d)]
 > idenumUp d = irunDim . denumUp d 
 > idenumDown d = irunDim . denumDown d
+>
 
 BoundedDimension
 ----------------
@@ -237,10 +238,10 @@ inferior y superior, ambas cerradas.
 >     {-# MINIMAL dfirst, dlast #-}
 >
 >     denum :: d -> Dim d [Quantized (DimensionIx d)]
->     denum d = dfirst d >>= denumUp d . unQuant
+>     denum d = dfirst d >>= denumUp d . unQ
 >
 >     denumr   :: d -> Dim d [Quantized (DimensionIx d)]
->     denumr d = dlast d >>= denumDown d . unQuant
+>     denumr d = dlast d >>= denumDown d . unQ
 
 
 Definimos atajos para dimensiones acotadas independientes (de tipo Dependent ())
@@ -342,19 +343,19 @@ iterar las dimensiones interiores para pasar a la exterior.
 > 
 >     dpred (da :~ db) (Quant (a :* b))
 >       = maybe (withPred db (Quant b) (yieldWithLast da))
->               (\a' -> yieldQuant (unQuant a' :* b))
+>               (\a' -> yieldQuant (unQ a' :* b))
 >               (runDim (dpred da (Quant a)) (Quant b))
 >
 >     dsucc (da :~ db) (Quant (a :* b))
 >       = maybe (withSucc db (Quant b) (yieldWithFirst da))
->               (\a' -> yieldQuant (unQuant a' :* b))
+>               (\a' -> yieldQuant (unQ a' :* b))
 >               (runDim (dsucc da (Quant a)) (Quant b))
 > 
 >     dfloor (da :~ db) (a :* b)
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withPred db (Quant b) (yieldWithLast da))
->                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (\a' -> yieldQuant (unQ a' :* b))
 >                 (runDim (dfloor da a) (Quant b))
 >         else withDep (dfloor db b)
 >          >>= maybe stopIteration (yieldWithLast da)
@@ -363,7 +364,7 @@ iterar las dimensiones interiores para pasar a la exterior.
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withSucc db (Quant b) (yieldWithFirst da))
->                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (\a' -> yieldQuant (unQ a' :* b))
 >                 (runDim (dceiling da a) (Quant b))
 >         else withDep (dceiling db b)
 >          >>= maybe stopIteration (yieldWithFirst da)
@@ -377,14 +378,14 @@ Las utilidades que acabamos de utilizar.
 > withPred d v f = withDep (dpred d v) >>= maybe stopIteration f
 >
 > yieldWithLast da b
->   = yieldQuant (unQuant (runDim (dlast da) b) :* unQuant b)
+>   = yieldQuant (unQ (runDim (dlast da) b) :* unQ b)
 > yieldWithFirst da b
->   = yieldQuant (unQuant (runDim (dfirst da) b) :* unQuant b)
+>   = yieldQuant (unQ (runDim (dfirst da) b) :* unQ b)
 >
 > iyieldWithLast da b
->   = yieldQuant (unQuant (irunDim (dlast da)) :* unQuant b)
+>   = yieldQuant (unQ (irunDim (dlast da)) :* unQ b)
 > iyieldWithFirst da b
->   = yieldQuant (unQuant (irunDim (dfirst da)) :* unQuant b)
+>   = yieldQuant (unQ (irunDim (dfirst da)) :* unQ b)
 
 
 Definimos de manera similar la instancia de `Dimension` para los productos
@@ -402,19 +403,19 @@ pasamos el índice de la dimensión exterior a la interior (usando `irunDim`).
 > 
 >     dpred (da :* db) (Quant (a :* b))
 >       = maybe (withPred db (Quant b) (iyieldWithLast da))
->               (\a' -> yieldQuant (unQuant a' :* b))
+>               (\a' -> yieldQuant (unQ a' :* b))
 >               (irunDim (dpred da (Quant a)))
 >
 >     dsucc (da :* db) (Quant (a :* b))
 >       = maybe (withSucc db (Quant b) (iyieldWithFirst da))
->               (\a' -> yieldQuant (unQuant a' :* b))
+>               (\a' -> yieldQuant (unQ a' :* b))
 >               (irunDim (dsucc da (Quant a)))
 > 
 >     dfloor (da :* db) (a :* b)
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withPred db (Quant b) (iyieldWithLast da))
->                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (\a' -> yieldQuant (unQ a' :* b))
 >                 (irunDim (dfloor da a))
 >         else withDep (dfloor db b)
 >          >>= maybe stopIteration (iyieldWithLast da)
@@ -423,7 +424,7 @@ pasamos el índice de la dimensión exterior a la interior (usando `irunDim`).
 >       = withDep (delem db b) >>= \isElemOfB ->
 >         if isElemOfB then
 >           maybe (withSucc db (Quant b) (iyieldWithFirst da))
->                 (\a' -> yieldQuant (unQuant a' :* b))
+>                 (\a' -> yieldQuant (unQ a' :* b))
 >                 (irunDim (dceiling da a))
 >         else withDep (dceiling db b)
 >          >>= maybe stopIteration (iyieldWithFirst da)
@@ -436,12 +437,12 @@ Los productos `:~` de dos `BoundedDimension` es a su vez una `BoundedDimension`
 >     dfirst (a :~ b) = do
 >       fb <- withDep (dfirst b)
 >       let fa = runDim (dfirst a) fb
->       return $ Quant (unQuant fa :* unQuant fb)
+>       return $ Quant (unQ fa :* unQ fb)
 >
 >     dlast  (a :~ b) = do
 >       lb <- withDep (dlast b)
 >       let la = runDim (dlast a) lb
->       return $ Quant (unQuant la :* unQuant lb)
+>       return $ Quant (unQ la :* unQ lb)
 
 Los productos `:+` también.
 
@@ -451,9 +452,9 @@ Los productos `:+` también.
 >     dfirst (a :* b) = do
 >       fb <- withDep (dfirst b)
 >       let fa = irunDim (dfirst a)
->       return $ Quant (unQuant fa :* unQuant fb)
+>       return $ Quant (unQ fa :* unQ fb)
 >
 >     dlast  (a :* b) = do
 >       lb <- withDep (dlast b)
 >       let la = irunDim (dlast a)
->       return $ Quant (unQuant la :* unQuant lb)
+>       return $ Quant (unQ la :* unQ lb)
