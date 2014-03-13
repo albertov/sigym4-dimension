@@ -32,6 +32,7 @@ takeSample = take 500
 
 spec :: Spec
 spec = do
+  dimensionSpec "Infinite Int" (Proxy :: Proxy (Infinite Int))
 
   dimensionSpec "Schedule ObservationTime"
                 (Proxy :: Proxy (Schedule ObservationTime))
@@ -234,6 +235,9 @@ data Proxy a = Proxy
 
 -- A continuación se implementan instancias de Arbitrary de varios tipos
 -- para poder generar valores aleatorios para tests de propiedades
+instance Arbitrary a => Arbitrary (Infinite a) where
+    arbitrary = return Inf
+
 instance Arbitrary ForecastTime where
     arbitrary = fromUTCTime <$> arbitrary
 
@@ -261,7 +265,8 @@ instance (Arbitrary a, Arbitrary b) => Arbitrary (a :~ b) where
     arbitrary = (:~) <$> arbitrary <*> arbitrary
 
 instance Arbitrary Horizons where
-    arbitrary = do n <- choose (2,100) 
+    arbitrary = do n <- choose (2,100)
+                   -- n>=2 pq. si no nunca se cumple la precondición de la prop.
                    fromList <$> vectorOf n arbitrary
 
 instance Arbitrary Horizon where
