@@ -45,14 +45,14 @@ instance Dimension BCronField where
 
     -- delem
     delem (CF Star lo hi) m = return $ lo<=m && m<=hi
-    delem (CF (SpecificField i) _ _) m = return $ m==i
-    delem (CF (RangeField a b) lo hi) m = return $ a<=m && m<=b
+    delem (CF (SpecificField i) lo hi) m = return $ inInt lo hi m && m==i
+    delem (CF (RangeField a b) lo hi) m = return $ inInt (max lo a) (min hi b) m
     delem (CF (ListField fs) lo hi) m
       = return $ any (\f -> idelem (CF f lo hi) m) fs
     delem (CF (StepField Star s) lo hi) m
-      = return $ lo<=m && m<=hi && m `mod` s == 0
+      = return $ inInt lo hi m && m `mod` s == 0
     delem (CF (StepField (RangeField a b) s) lo hi) m
-      = return $ a<=m && m<=b && m `mod` s == 0
+      = return $ inInt (max lo a) (min hi b) m && m `mod` s == 0
     delem (CF f@(StepField _ _) _ _) _ 
       = error $ "delem(BCronField): Unimplemented " ++ show f
 
@@ -64,25 +64,25 @@ instance Dimension BCronField where
 
     dpred (CF (SpecificField _) _ _) _ = stopIteration
 
-    -- FIXME
-    dpred (CF (RangeField a _) lo _) m
-      | lo'<=m'    = yieldQuant m'
-      | otherwise  = stopIteration
+    dpred (CF (RangeField a b) lo hi) m
+      | inInt lo' hi' m' = yieldQuant m'
+      | otherwise        = stopIteration
       where
         lo' = max lo a
+        hi' = min hi b
         m'  = unQ m - 1
 
-    dpred (CF (StepField Star s) lo _) m
-      | m'>= lo   = yieldQuant m'
-      | otherwise = stopIteration
-      where m' = (unQ m `modFloor` s) - s
+    dpred (CF (StepField Star s) lo hi) m
+      = case dropWhile (>= unQ m) (reverse (expand lo hi s)) of
+          []    -> stopIteration
+          (c:_) -> yieldQuant c
 
-    -- FIXME
-    dpred (CF (StepField (RangeField a _) s) lo _) m
-      | m'>= lo'   = yieldQuant m'
-      | otherwise  = stopIteration
-      where m'  = (unQ m `modFloor` s) - s
+    dpred (CF (StepField (RangeField a b) s) lo hi) m
+      | inInt lo' hi' m' = yieldQuant m'
+      | otherwise        = stopIteration
+      where m'  = unQ m - s
             lo' = max lo a
+            hi' = min hi b
 
     dpred (CF (ListField fs') lo hi) m = return maxPred
       where
@@ -96,31 +96,32 @@ instance Dimension BCronField where
 
 
     -- succ
-    dsucc (CF Star _ hi) m
-      | m'<=hi    = yieldQuant m'
-      | otherwise = stopIteration
+    dsucc (CF Star lo hi) m
+      | inInt lo hi m' = yieldQuant m'
+      | otherwise        = stopIteration
       where m' = unQ m + 1
 
     dsucc (CF (SpecificField _) _ _) _ = stopIteration
 
-    -- FIXME
-    dsucc (CF (RangeField _ b) _ hi) m
-      | m'<=hi'     = yieldQuant m'
-      | otherwise   = stopIteration
+    dsucc (CF (RangeField a b) lo hi) m
+      | inInt lo' hi' m' = yieldQuant m'
+      | otherwise        = stopIteration
       where m'  = unQ m + 1
             hi' = min hi b
+            lo' = max lo a
 
-    dsucc (CF (StepField Star s) _ hi) m
-      | m'<= hi   = yieldQuant m'
-      | otherwise = stopIteration
-      where m' = (unQ m `modCeil` s) + s
+    dsucc (CF (StepField Star s) lo hi) m
+      = case dropWhile (<= unQ m) (expand lo hi s) of
+          []    -> stopIteration
+          (c:_) -> yieldQuant c
 
     -- FIXME
-    dsucc (CF (StepField (RangeField _ b) s) _ hi) m
-      | m'<= hi'   = yieldQuant m'
-      | otherwise  = stopIteration
-      where m'  = (unQ m `modCeil` s) + s
+    dsucc (CF (StepField (RangeField a b) s) lo hi) m
+      | inInt lo' hi' m' = yieldQuant m'
+      | otherwise        = stopIteration
+      where m'  = unQ m  + s
             hi' = min hi b
+            lo' = max lo a
 
     dsucc (CF (ListField fs') lo hi) m = return minSucc
       where
@@ -141,20 +142,20 @@ instance Dimension BCronField where
       | i<=m, lo<=i, i<=hi = yieldQuant i
       | otherwise          = stopIteration
 
-    -- FIXME
     dfloor (CF (RangeField a b) lo hi) m
-      | a<=m      = yieldQuant $ min b m
-      | otherwise = stopIteration
+      | lo'<=m, b<=hi = yieldQuant $ min b m
+      | otherwise     = stopIteration
+      where lo' = max lo a
 
     dfloor (CF (StepField Star s) lo hi) m
-      | m'>= lo   = yieldQuant $ min hi m'
-      | otherwise = stopIteration
-      where m' = m `modFloor` s
+      = case dropWhile (>m) (reverse (expand lo hi s)) of
+          []    -> stopIteration
+          (c:_) -> yieldQuant c
 
     -- FIXME
     dfloor (CF (StepField (RangeField a b) s) lo hi) m
-      | m'>= lo'  = yieldQuant $ min hi' m'
-      | otherwise = stopIteration
+      | m'>= lo', b<=hi  = yieldQuant $ max a m'
+      | otherwise        = stopIteration
       where m'  = m `modFloor` s
             lo' = max lo a
             hi' = min hi b
@@ -178,25 +179,23 @@ instance Dimension BCronField where
       | m<=i, lo<=i, i<=hi = yieldQuant i
       | otherwise          = stopIteration
 
-    -- FIXME
     dceiling (CF (RangeField a b) lo hi) m
-      | m<=b      = yieldQuant $ max a m
-      | otherwise = stopIteration
+      | m<=a, b<=hi = yieldQuant $ max a m
+      | otherwise   = stopIteration
       where
-        lo' = max lo a
         hi' = min hi b
+        lo' = max lo a
 
     dceiling (CF (StepField Star s) lo hi) m
-      | m'<=hi    = yieldQuant $ max lo m'
-      | otherwise = stopIteration
-      where m' = m `modCeil` s
+      = case dropWhile (<m) (expand lo hi s) of
+          []    -> stopIteration
+          (c:_) -> yieldQuant c
 
     -- FIXME
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
-      | m'<=hi'   = yieldQuant $ max lo' m'
-      | otherwise = stopIteration
+      | m'<=hi', lo<=a = yieldQuant $ max a m'
+      | otherwise      = stopIteration
       where m'  = m `modCeil` s
-            lo' = max lo a
             hi' = min hi b
 
     dceiling (CF (ListField fs') lo hi) m = minCeil
@@ -209,6 +208,7 @@ instance Dimension BCronField where
     dceiling (CF f@(StepField _ _) _ _) _
       = error $ "dceiling(CronField): Unimplemented " ++ show f
 
+expand lo hi s = [i | i<-[lo..hi], i `mod` s==0]
 
 instance BoundedDimension BCronField where
     dfirst (CF Star lo _ ) = yieldQuant lo
@@ -222,8 +222,11 @@ instance BoundedDimension BCronField where
       = case catMaybes . map (\f -> idfirst (CF f lo hi)) $ fs of
           [] -> stopIteration
           ls -> yieldQuant . unQ . minimum $ ls
-    dfirst (CF (StepField Star s) lo _)
-      = yieldQuant (lo `modCeil` s)
+    dfirst (CF (StepField Star s) lo hi)
+      = case expand lo hi s of
+          []    -> stopIteration
+          (x:_) -> yieldQuant x
+    -- FIXME
     dfirst (CF (StepField (RangeField a _) s) lo _)
       | a>=lo     = yieldQuant (a `modFloor` s)
       | otherwise = stopIteration
@@ -241,8 +244,11 @@ instance BoundedDimension BCronField where
       = case catMaybes . map (\f -> idlast (CF f lo hi)) $ fs of
           [] -> stopIteration
           ls -> yieldQuant . unQ . maximum $ ls
-    dlast (CF (StepField Star s) _ hi)
-      = yieldQuant (hi `modFloor` s)
+    dlast (CF (StepField Star s) lo hi)
+      = case reverse (expand lo hi s) of
+          []    -> stopIteration
+          (x:_) -> yieldQuant x
+    -- FIXME
     dlast  (CF (StepField (RangeField _ b) s) _  hi)
       | b<=hi     = yieldQuant (b `modFloor` s)
       | otherwise = stopIteration
@@ -379,3 +385,5 @@ scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* domd :~ (CF mths 1 12 :* Inf)
                      , dayOfWeek  = DaysOfWeek dows
                      , month      = Months mths} = cs
         domd = DomDim doms dows
+
+inInt lo hi v = lo<=v && v<=hi
