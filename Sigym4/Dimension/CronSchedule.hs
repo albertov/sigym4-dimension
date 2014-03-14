@@ -64,6 +64,7 @@ instance Dimension BCronField where
 
     dpred (CF (SpecificField _) _ _) _ = stopIteration
 
+    -- FIXME
     dpred (CF (RangeField a b) lo hi) m
       | inInt lo' hi' m' = yieldQuant m'
       | otherwise        = stopIteration
@@ -103,6 +104,7 @@ instance Dimension BCronField where
 
     dsucc (CF (SpecificField _) _ _) _ = stopIteration
 
+    -- FIXME
     dsucc (CF (RangeField a b) lo hi) m
       | inInt lo' hi' m' = yieldQuant m'
       | otherwise        = stopIteration
@@ -143,9 +145,10 @@ instance Dimension BCronField where
       | otherwise          = stopIteration
 
     dfloor (CF (RangeField a b) lo hi) m
-      | lo'<=m, b<=hi = yieldQuant $ min b m
-      | otherwise     = stopIteration
+      | lo'<=m    = yieldQuant $ min hi' m
+      | otherwise = stopIteration
       where lo' = max lo a
+            hi' = min hi b
 
     dfloor (CF (StepField Star s) lo hi) m
       = case dropWhile (>m) (reverse (expand lo hi s)) of
@@ -180,8 +183,8 @@ instance Dimension BCronField where
       | otherwise          = stopIteration
 
     dceiling (CF (RangeField a b) lo hi) m
-      | m<=a, b<=hi = yieldQuant $ max a m
-      | otherwise   = stopIteration
+      | m<=hi'    = yieldQuant $ max lo' m
+      | otherwise = stopIteration
       where
         hi' = min hi b
         lo' = max lo a
