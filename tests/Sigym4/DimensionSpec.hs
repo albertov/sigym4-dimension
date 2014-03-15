@@ -63,10 +63,9 @@ spec = do
       it "returns only feb 29" $ do
         let sched  = "0 0 29 2 *" :: CronSchedule
             Just t = idfloor sched (datetime 2012 3 1 0 0)
-            Just s = idsucc sched t
-        unQ s `shouldBe` datetime 2012 2 29 0 0
-        fmap unQ (idsucc sched s) `shouldBe` Just (datetime 2016 2 29 0 0)
-        fmap unQ (idpred sched s) `shouldBe` Just (datetime 2008 2 29 0 0)
+        unQ t `shouldBe` datetime 2012 2 29 0 0
+        fmap unQ (idsucc sched t) `shouldBe` Just (datetime 2016 2 29 0 0)
+        fmap unQ (idpred sched t) `shouldBe` Just (datetime 2008 2 29 0 0)
 
       it "returns only feb 29 on monday" $ do
         let sched     = "0 0 29 2 1" :: CronSchedule

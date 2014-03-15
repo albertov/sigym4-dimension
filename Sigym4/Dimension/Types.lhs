@@ -69,6 +69,7 @@ Se define el interfaz del módulo...
 > import Control.Monad.Reader (Reader, runReader, ask)
 > import Control.Applicative (Applicative)
 > import Data.Typeable (Typeable)
+> import Data.Maybe (isJust, fromJust)
 
 Dimension
 ---------
@@ -392,33 +393,31 @@ iterar las dimensiones interiores para pasar a la exterior.
 >           | otherwise = stopIteration
 >         try n p = maybe (loop n p) (`combine` p) (runDim (dfirst da) p)
 >
->     -- FIXME: Copiar logica original de :*, no es el mismo caso
->     --        cuando b pertenece a db y cuando no. Cuando pertenece buscamos
->     --        ceil a, sino first da. Ahora mismo siempre es ceil a ya
 >     dfloor (da :~ db) (a :* b)
->       = withDep (dfloor db b) >>= maybe stopIteration (loop maxTryIfNoBound)
->       where
->         loop n b'
->           | n > 0 = maybe (withPred db b' (try (n-1)))
->                      (\a' -> combine a' b')
->                      (runDim (dfloor da a) b')
->           | otherwise = stopIteration
->         try n p = maybe (loop n p) (`combine` p) (runDim (dlast da) p)
+>       = withDep (delem db b) >>= \isElemOfB ->
+>         if isElemOfB then let qb = Quant b in
+>           maybe (withDep (dpred db qb) >>= maybe stopIteration combineLst)
+>                 (`combine` qb)
+>                 (runDim (dfloor da a) qb)
+>         else withDep (dfloor db b) >>= maybe stopIteration combineLst
+>       where combineLst b' = findWith (dlast da) (dpred db) b'
+>                         >>= maybe stopIteration (uncurry combine)
 >
->     -- FIXME: Copiar logica original de :*, no es el mismo caso
->     --        cuando b pertenece a db y cuando no. Cuando pertenece buscamos
->     --        ceil a, sino first da. Ahora mismo siempre es ceil a ya
->     --        
 >     dceiling (da :~ db) (a :* b)
->       = withDep (dceiling db b) >>= maybe stopIteration (loop maxTryIfNoBound)
->       where
->         loop n b'
->           | n > 0 = maybe (withSucc db b' (try (n-1)))
->                      (\a' -> combine a' b')
->                      (runDim (dceiling da a) b')
->           | otherwise = stopIteration
->         try n p = maybe (loop n p) (`combine` p) (runDim (dfirst da) p)
+>       = withDep (delem db b) >>= \isElemOfB ->
+>         if isElemOfB then let qb = Quant b in
+>           maybe (withDep (dsucc db qb) >>= maybe stopIteration combineFst)
+>                 (`combine` qb)
+>                 (runDim (dceiling da a) qb)
+>         else withDep (dceiling db b) >>= maybe stopIteration combineFst
+>       where combineFst b' = findWith (dfirst da) (dsucc db) b'
+>                         >>= maybe stopIteration (uncurry combine)
 
+> findWith f g = loop maxTryIfNoBound
+>   where
+>     loop 0 _ = stopIteration
+>     loop n v | isJust (runDim f v) = return $ Just (fromJust (runDim f v), v)
+>              | otherwise  = withDep (g v) >>= maybe stopIteration (loop (n-1))
 
 Las utilidades que acabamos de utilizar.
 

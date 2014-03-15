@@ -64,7 +64,6 @@ instance Dimension BCronField where
 
     dpred (CF (SpecificField _) _ _) _ = stopIteration
 
-    -- FIXME
     dpred (CF (RangeField a b) lo hi) m
       | inInt lo' hi' m' = yieldQuant m'
       | otherwise        = stopIteration
@@ -104,7 +103,6 @@ instance Dimension BCronField where
 
     dsucc (CF (SpecificField _) _ _) _ = stopIteration
 
-    -- FIXME
     dsucc (CF (RangeField a b) lo hi) m
       | inInt lo' hi' m' = yieldQuant m'
       | otherwise        = stopIteration
