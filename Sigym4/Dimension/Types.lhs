@@ -392,6 +392,9 @@ iterar las dimensiones interiores para pasar a la exterior.
 >           | otherwise = stopIteration
 >         try n p = maybe (loop n p) (`combine` p) (runDim (dfirst da) p)
 >
+>     -- FIXME: Copiar logica original de :*, no es el mismo caso
+>     --        cuando b pertenece a db y cuando no. Cuando pertenece buscamos
+>     --        ceil a, sino first da. Ahora mismo siempre es ceil a ya
 >     dfloor (da :~ db) (a :* b)
 >       = withDep (dfloor db b) >>= maybe stopIteration (loop maxTryIfNoBound)
 >       where
@@ -402,6 +405,10 @@ iterar las dimensiones interiores para pasar a la exterior.
 >           | otherwise = stopIteration
 >         try n p = maybe (loop n p) (`combine` p) (runDim (dlast da) p)
 >
+>     -- FIXME: Copiar logica original de :*, no es el mismo caso
+>     --        cuando b pertenece a db y cuando no. Cuando pertenece buscamos
+>     --        ceil a, sino first da. Ahora mismo siempre es ceil a ya
+>     --        
 >     dceiling (da :~ db) (a :* b)
 >       = withDep (dceiling db b) >>= maybe stopIteration (loop maxTryIfNoBound)
 >       where
