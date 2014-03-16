@@ -332,19 +332,23 @@ getDowDpm dom = getDep >>= \d ->
   in return (dow, dpm)
 
 instance BoundedDimension DayOfMonthDim where
-    dfirst = withDynamicDom0 idfirst
-    dlast  = withDynamicDom0 idlast
+    dfirst = withDynamicDom0 idfirst idsucc
+    dlast  = withDynamicDom0 idlast  idpred
 
-withDynamicDom0 f (DomDim doms dows) = getDep >>= \d ->
+withDynamicDom0 f g (DomDim doms dows) = getDep >>= \d ->
     let m:*y      = unQ d
         dpm       = daysPerMonth y m
+        cfDoms    = CF doms 1 dpm
+        cfDows    = CF dows 1 7
         wDay day  = dow
           where (_,_,dow) = toWeekDate $ (fromGregorian (fromIntegral y) m day')
                 day'      = unQ day
-    in return $
-       case f (CF doms 1 dpm) of
-         Just j |(CF dows 1 7) `idelem` wDay j -> Just j
-         _                                     -> Nothing
+        tryWith t = case t of
+                     Just j | cfDows `idelem` wDay j -> Just j
+                     Just j                          -> tryWith (g cfDoms j)
+                     _                               -> Nothing
+    in return $ tryWith (f cfDoms)
+
 
 
 daysPerMonth :: Int -> Int -> Int
