@@ -4,6 +4,8 @@
            , TypeOperators
            , TypeFamilies
            , FlexibleContexts
+           , FlexibleInstances
+           , TypeSynonymInstances
            #-}
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
@@ -12,7 +14,8 @@ import Test.Hspec.QuickCheck
 import Data.Time.Calendar
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock
-import Data.List as L
+import qualified Data.List as L
+import qualified Data.Set as S
 import Data.Maybe (isJust, fromJust)
 import Data.Either (isRight)
 import Data.String (fromString)
@@ -233,7 +236,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
     it "does not return duplicate elements" $ property $
         \((d::dim), i) ->
             let elems = takeSample $ idenumUp d i
-            in L.nub elems == elems
+            in nub elems == elems
 
 
   describe "idenumDown" $ do
@@ -251,7 +254,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
     it "does not return duplicate elements" $ property $
         \((d::dim), i) ->
             let elems = takeSample $ idenumUp d i
-            in L.nub elems == elems
+            in nub elems == elems
 
 
 -- Utilidades
@@ -325,7 +328,7 @@ instance Arbitrary CronSchedule where
 instance Arbitrary DayOfWeekSpec where
     arbitrary = DaysOfWeek <$> arbitraryCronField (1,7)
 instance Arbitrary DayOfMonthSpec where
-    arbitrary = DaysOfMonth <$> arbitraryCronField (1,29)
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,31)
 instance Arbitrary MonthSpec where
     arbitrary = Months <$> arbitraryCronField (1,12)
 instance Arbitrary MinuteSpec where
@@ -353,3 +356,10 @@ arbitraryCronField range
     stepField     = StepField  <$> oneof [star]--,rangeField]
                                <*> choose ( max 1 (fst range)
                                           , snd range)
+
+nub :: (Ord a) => [a] -> [a]
+nub = go S.empty
+  where go _ [] = []
+        go s (x:xs) | S.member x s = go s xs
+                    | otherwise    = x : go (S.insert x s) xs
+

@@ -22,6 +22,7 @@ library
                    , monad-loops
                    , mtl
                    , attoparsec
+                   , containers
                    , cron
                    , time
                     
@@ -41,6 +42,7 @@ test-suite main
                    , hspec
                    , QuickCheck
                    , attoparsec
+                   , containers
                    , sigym4-dimension
   hs-source-dirs:    tests
   main-is:           Spec.hs

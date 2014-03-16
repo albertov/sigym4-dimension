@@ -22,11 +22,11 @@ Tiempos
 >   , Schedule (..)
 > ) where
 
-> import Data.List (sort, nub)
 > import Data.String (IsString(fromString))
 > import Data.Time.Clock (UTCTime(..), NominalDiffTime, addUTCTime)
 > import Data.Time ()
 > import Data.Typeable (Typeable)
+> import qualified Data.Set as S
 > import GHC.Exts (IsList (..))
 > import Sigym4.Dimension.Types
 > import Sigym4.Dimension.CronSchedule
@@ -219,7 +219,7 @@ sin afectar al código que lo use, por ejemplo, si se da el caso de conjuntos
 de muchos horizontes se puede cambiar la lista por un árbol binario que es
 O(log n) en vez de O(n) en `dpred`, `dsucc`, `dfloor` y `dceiling`.
 
-> newtype Horizons = Horizons [Horizon] deriving (Eq,Ord,Show,Read,Typeable)
+> type Horizons = S.Set Horizon
 
 Definimos una instancia de `IsList` para poder escribir constantes como listas
 habilitando la extension `XOverloadedLists`. Ojo, dará error en tiempo de
@@ -229,38 +229,9 @@ ejecución una lista vacía, también se puede arreglar con TemplateHaskell.
 >     type Item Horizons  = Horizon
 >     fromList l
 >         | null l    = error "fromList(Horizons): Cannot be an empty list"
->         | otherwise = Horizons . nub . sort $ l
->     toList (Horizons l) = l
+>         | otherwise = S.fromList l
+>     toList  = S.toAscList
  
-A continuación se definen las instancias para que `Horizons` sea una dimensión
-finita (`BoundedDimension`).
- 
-> instance Dimension Horizons where
->     type DimensionIx Horizons = Horizon
->     type Dependent   Horizons = ()
->     delem (Horizons ds) = return . (`elem` ds)
->     dpred (Horizons ds) d
->       = case dropWhile (>= unQ d) (reverse ds) of
->           []    -> stopIteration
->           (x:_) -> yieldQuant x
->     dsucc (Horizons ds) d
->       = case dropWhile (<= unQ d) ds of
->           []    -> stopIteration
->           (x:_) -> yieldQuant x
->     dfloor (Horizons ds) d
->       = case dropWhile (> d) (reverse ds) of
->           []    -> stopIteration
->           (x:_) -> yieldQuant x
->     dceiling (Horizons ds) d
->       = case dropWhile (< d) ds of
->           []    -> stopIteration
->           (x:_) -> yieldQuant x
-> 
-> instance BoundedDimension Horizons where
->     dfirst (Horizons ds) = yieldQuant $ head ds
->     dlast  (Horizons ds) = yieldQuant $ last ds
->     -- denum  (Horizons ds) = return (map Quant ds)
-
 Horizontes dinámicos
 --------------------
 

@@ -70,6 +70,7 @@ Se define el interfaz del módulo...
 > import Control.Applicative (Applicative)
 > import Data.Typeable (Typeable)
 > import Data.Maybe (isJust, fromJust)
+> import qualified Data.Set as S
 
 Dimension
 ---------
@@ -512,3 +513,27 @@ Los productos `:+` también.
 >       case (fa,fb) of
 >         (Just fa', Just fb') -> combine fa' fb'
 >         _                    -> stopIteration
+
+
+Conjuntos
+---------
+
+Podermos definir trivialmente cualquier conjunto `Data.Set.Set` como una
+`BoundedDimension`.
+
+> instance (Show a, Ord a) => Dimension (S.Set a) where
+>    type DimensionIx (S.Set a) = a
+>    type Dependent (S.Set a)   = ()
+>    delem s e    = return $ S.member e s
+>    dsucc s e    = return . fmap Quant $ S.lookupGT (unQ e) s
+>    dpred s e    = return . fmap Quant $ S.lookupLT (unQ e) s
+>    dfloor s e   = return . fmap Quant $ S.lookupLE e s
+>    dceiling s e = return . fmap Quant $ S.lookupGE e s
+
+> instance (Show a, Ord a) => BoundedDimension (S.Set a) where
+>    dfirst s | S.null s  = stopIteration
+>             | otherwise = yieldQuant . S.findMin $ s
+>    dlast  s | S.null s  = stopIteration
+>             | otherwise = yieldQuant . S.findMax $ s
+>    denum  = return . map Quant . S.toAscList
+>    denumr = return . map Quant . S.toDescList

@@ -143,8 +143,8 @@ instance Dimension BCronField where
       | otherwise          = stopIteration
 
     dfloor (CF (RangeField a b) lo hi) m
-      | lo'<=m    = yieldQuant $ min hi' m
-      | otherwise = stopIteration
+      | lo'<=m, lo'<=hi' = yieldQuant $ min hi' m
+      | otherwise        = stopIteration
       where lo' = max lo a
             hi' = min hi b
 
@@ -181,8 +181,8 @@ instance Dimension BCronField where
       | otherwise          = stopIteration
 
     dceiling (CF (RangeField a b) lo hi) m
-      | m<=hi'    = yieldQuant $ max lo' m
-      | otherwise = stopIteration
+      | m<=hi', lo'<=hi' = yieldQuant $ max lo' m
+      | otherwise        = stopIteration
       where
         hi' = min hi b
         lo' = max lo a
@@ -216,9 +216,9 @@ instance BoundedDimension BCronField where
     dfirst (CF (SpecificField i) lo hi)
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
-    dfirst (CF (RangeField a _) lo _)
-      | a>=lo     = yieldQuant a
-      | otherwise = stopIteration
+    dfirst (CF (RangeField a b) lo hi)
+      | a>=lo, a<=hi = yieldQuant a
+      | otherwise    = stopIteration
     dfirst (CF (ListField fs) lo hi)
       = case catMaybes . map (\f -> idfirst (CF f lo hi)) $ fs of
           [] -> stopIteration
@@ -238,9 +238,9 @@ instance BoundedDimension BCronField where
     dlast (CF (SpecificField i) lo hi)
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
-    dlast (CF (RangeField _ b) _ hi)
-      | b<=hi     = yieldQuant b
-      | otherwise = stopIteration
+    dlast  (CF (RangeField a b) lo hi)
+      | b>=lo, b<=hi = yieldQuant b
+      | otherwise    = stopIteration
     dlast (CF (ListField fs) lo hi)
       = case catMaybes . map (\f -> idlast (CF f lo hi)) $ fs of
           [] -> stopIteration
