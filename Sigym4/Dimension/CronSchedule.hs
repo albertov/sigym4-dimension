@@ -75,14 +75,11 @@ instance Dimension BCronField where
         m'  = unQ m - 1
 
     dpred (CF (StepField Star s) lo hi) m
-      = case dropWhile (>= unQ m) (reverse (expand lo hi s)) of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (>= unQ m) . reverse $ expand lo hi s
 
     dpred (CF (StepField (RangeField a b) s) lo hi) m
-      = case dropWhile (>= unQ m) $ reverse $ expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (>= unQ m) . reverse $ expand (max lo a)
+                                                            (min hi b) s 
 
     dpred (CF (ListField fs') lo hi) m = return maxPred
       where
@@ -116,14 +113,10 @@ instance Dimension BCronField where
             lo' = max lo a
 
     dsucc (CF (StepField Star s) lo hi) m
-      = case dropWhile (<= unQ m) (expand lo hi s) of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (<= unQ m) $ expand lo hi s
 
     dsucc (CF (StepField (RangeField a b) s) lo hi) m
-      = case dropWhile (<= unQ m) $ expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (<= unQ m) $ expand (max lo a) (min hi b) s
 
     dsucc (CF (ListField fs') lo hi) m = return minSucc
       where
@@ -157,14 +150,10 @@ instance Dimension BCronField where
             hi' = min hi b
 
     dfloor (CF (StepField Star s) lo hi) m
-      = case dropWhile (>m)  $ reverse (expand lo hi s) of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (>m)  . reverse $ expand lo hi s
 
     dfloor (CF (StepField (RangeField a b) s) lo hi) m
-      = case dropWhile (>m) $ reverse $ expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (>m) . reverse $ expand (max lo a) (min hi b) s
 
     dfloor (CF (ListField fs') lo hi) m = maxFloor
       where
@@ -193,14 +182,10 @@ instance Dimension BCronField where
         lo' = max lo a
 
     dceiling (CF (StepField Star s) lo hi) m
-      = case dropWhile (<m) (expand lo hi s) of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (<m) $ expand lo hi s
 
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
-      = case dropWhile (<m) $ expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (c:_) -> yieldQuant c
+      = yieldHead . dropWhile (<m) $ expand (max lo a) (min hi b) s
 
     dceiling (CF (ListField fs') lo hi) m = minCeil
       where
@@ -231,9 +216,7 @@ instance BoundedDimension BCronField where
           []    -> stopIteration
           (x:_) -> yieldQuant x
     dfirst (CF (StepField (RangeField a b) s) lo hi)
-      = case expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (x:_) -> yieldQuant x
+      = yieldHead $ expand (max lo a) (min hi b) s
     dfirst (CF f@(StepField _ _) _ _)
       = error $ "dfirst(CronField): Unimplemented " ++ show f
 
@@ -249,13 +232,9 @@ instance BoundedDimension BCronField where
           [] -> stopIteration
           ls -> yieldQuant . unQ . maximum $ ls
     dlast (CF (StepField Star s) lo hi)
-      = case reverse $ expand lo hi s of
-          []    -> stopIteration
-          (x:_) -> yieldQuant x
+      = yieldHead . reverse $ expand lo hi s
     dlast  (CF (StepField (RangeField a b) s) lo  hi)
-      = case reverse  $ expand (max lo a) (min hi b) s of
-          []    -> stopIteration
-          (x:_) -> yieldQuant x
+      = yieldHead . reverse  $ expand (max lo a) (min hi b) s
     dlast  (CF f@(StepField _ _) _ _)
       = error $ "dlast(CronField): Unimplemented " ++ show f
 
@@ -395,3 +374,7 @@ scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* domd :~ (CF mths 1 12 :* Inf)
         domd = DomDim doms dows
 
 inInt lo hi v = lo<=v && v<=hi
+
+yieldHead xs = case xs of
+                 []    -> stopIteration
+                 (c:_) -> yieldQuant c
