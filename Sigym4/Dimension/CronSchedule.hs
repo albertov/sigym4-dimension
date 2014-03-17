@@ -6,6 +6,7 @@
            #-}
 module Sigym4.Dimension.CronSchedule (
    CronSchedule (..)
+ , BCronField (..)
  ) where
 
 import Data.Attoparsec.Text (parseOnly)
