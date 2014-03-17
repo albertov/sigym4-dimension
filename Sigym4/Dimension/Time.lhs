@@ -129,7 +129,16 @@ adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 > qtoUTCTime :: Time t => Quantized t -> Quantized UTCTime
 > qtoUTCTime = fmap toUTCTime
 
+> adaptMaybeTime :: (Time t, Time a)
+>   => (UTCTime -> Maybe (Quantized UTCTime))
+>   -> a
+>   -> Maybe (Quantized t)
 > adaptMaybeTime f = fmap qfromUTCTime . f . toUTCTime
+
+> qadaptMaybeTime :: (Time t1, Time t)
+>   => (Quantized UTCTime -> Maybe (Quantized UTCTime))
+>   -> Quantized t1
+>   -> Maybe (Quantized t)
 > qadaptMaybeTime f = fmap qfromUTCTime . f . qtoUTCTime
 
 Horizontes
@@ -274,4 +283,5 @@ ascendentemente!
 >     dlast f  = getHs f >>= \ds -> if null ds then stopIteration
 >                                              else yieldQuant $ last ds
 >
+> getHs :: (DimensionIx (Dependent d) -> b) -> Dim d b
 > getHs f = getDep >>= return . f . unQ

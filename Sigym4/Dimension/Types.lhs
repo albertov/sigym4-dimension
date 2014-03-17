@@ -55,6 +55,7 @@ Se define el interfaz del módulo...
 >   , (:~)(..)
 >   , (:*)(..)
 >   -- | * Utilidades para instancias de 'Dimension'
+>   , Dim
 >   , getDep
 >   , runDim
 >   , irunDim

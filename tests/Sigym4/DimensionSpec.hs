@@ -51,7 +51,7 @@ spec = do
 
 
   context "CronSchedule" $ do
-    {-
+    {- El modélo está mal. No trata el 0 como domingo
     describe "idelem" $ do
       it "behaves like model" $ property $
         \(s, t) -> s `idelem` t == s `scheduleMatches` t

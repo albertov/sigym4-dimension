@@ -36,7 +36,14 @@ instance Dimension CronSchedule where
     dfloor   s = return . adaptMaybeTime (idfloor (scheduleToDim s))
     dceiling s = return . adaptMaybeTime (idceiling (scheduleToDim s))
 
+adaptMaybeTime :: (TimeIx -> Maybe (Quantized TimeIx))
+               -> UTCTime
+               -> Maybe (Quantized UTCTime)
 adaptMaybeTime f = fmap ndimIxToTime . f . timeToDimIx
+
+qadaptMaybeTime :: (Quantized TimeIx -> Maybe (Quantized TimeIx))
+                -> Quantized UTCTime
+                -> Maybe (Quantized UTCTime)
 qadaptMaybeTime f = fmap ndimIxToTime . f . qtimeToDimIx
 
 data BCronField = CF CronField Int Int deriving Show
@@ -197,6 +204,7 @@ instance Dimension BCronField where
     dceiling (CF f@(StepField _ _) _ _) _
       = error $ "dceiling(CronField): Unimplemented " ++ show f
 
+expand :: Integral t => t -> t -> t -> [t]
 expand lo hi s = [i | i<-[lo..hi], i `mod` s==0]
 
 instance BoundedDimension BCronField where
@@ -204,7 +212,7 @@ instance BoundedDimension BCronField where
     dfirst (CF (SpecificField i) lo hi)
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
-    dfirst (CF (RangeField a b) lo hi)
+    dfirst (CF (RangeField a _) lo hi)
       | a>=lo, a<=hi = yieldQuant a
       | otherwise    = stopIteration
     dfirst (CF (ListField fs) lo hi)
@@ -224,7 +232,7 @@ instance BoundedDimension BCronField where
     dlast (CF (SpecificField i) lo hi)
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
-    dlast  (CF (RangeField a b) lo hi)
+    dlast  (CF (RangeField _ b) lo hi)
       | b>=lo, b<=hi = yieldQuant b
       | otherwise    = stopIteration
     dlast (CF (ListField fs) lo hi)
@@ -237,13 +245,6 @@ instance BoundedDimension BCronField where
       = yieldHead . reverse  $ expand (max lo a) (min hi b) s
     dlast  (CF f@(StepField _ _) _ _)
       = error $ "dlast(CronField): Unimplemented " ++ show f
-
-modFloor, modCeil :: Integral a => a -> a -> a
-modFloor a m = a - (a `mod` m)
-modCeil  a m
-  | md == 0   = a
-  | otherwise = a + (m-md)
-  where md = a `mod` m
 
 
 data DayOfMonthDim = DomDim CronField CronField deriving Show
@@ -307,6 +308,8 @@ instance Dimension DayOfMonthDim where
 
       loop i
 
+getDowDpm :: DimensionIx (Dependent d) ~ (Int :* Int)
+  => Int -> Dim d (Int, Int)
 getDowDpm dom = getDep >>= \d ->
   let m :* y    = unQ d
       dpm       = daysPerMonth y m
@@ -314,10 +317,15 @@ getDowDpm dom = getDep >>= \d ->
   in return (dow, dpm)
 
 instance BoundedDimension DayOfMonthDim where
-    dfirst = withDynamicDom0 idfirst idsucc
-    dlast  = withDynamicDom0 idlast  idpred
+    dfirst = withDynamicDom idfirst idsucc
+    dlast  = withDynamicDom idlast  idpred
 
-withDynamicDom0 f g (DomDim doms dows) = getDep >>= \d ->
+withDynamicDom :: (DimensionIx (Dependent d) ~ (Int :* Int))
+  => (BCronField -> Maybe (Quantized Int))
+  -> (BCronField -> Quantized Int -> Maybe (Quantized Int))
+  -> DayOfMonthDim
+  -> Dim d (Maybe (Quantized Int))
+withDynamicDom f g (DomDim doms dows) = getDep >>= \d ->
     let m:*y      = unQ d
         dpm       = daysPerMonth y m
         cfDoms    = CF doms 1 dpm
@@ -373,8 +381,10 @@ scheduleToDim  cs = CF mins 0 59 :* CF hrs 0 23 :* domd :~ (CF mths 1 12 :* Inf)
                      , month      = Months mths} = cs
         domd = DomDim doms dows
 
+inInt :: Ord a => a -> a -> a -> Bool
 inInt lo hi v = lo<=v && v<=hi
 
+yieldHead :: [a] -> Dim d (Maybe (Quantized a))
 yieldHead xs = case xs of
                  []    -> stopIteration
                  (c:_) -> yieldQuant c
