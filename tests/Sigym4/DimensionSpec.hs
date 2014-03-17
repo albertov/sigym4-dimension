@@ -353,7 +353,7 @@ arbitraryCronField range
                                       , specificField
                                       , rangeField
                                       , stepField])
-    stepField     = StepField  <$> oneof [star]--,rangeField]
+    stepField     = StepField  <$> oneof [star, rangeField]
                                <*> choose ( max 1 (fst range)
                                           , snd range)
 
