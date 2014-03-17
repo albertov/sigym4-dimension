@@ -11,13 +11,14 @@ module Sigym4.Dimension.CronSchedule (
 
 import Data.Attoparsec.Text (parseOnly)
 import Data.String (IsString(fromString))
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromJust, isJust)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
 import Data.Time.Calendar          (toGregorian, fromGregorian, isLeapYear)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
+import Data.List (partition)
 
 import Sigym4.Dimension.Types
 
@@ -87,10 +88,15 @@ instance Dimension BCronField where
 
     dpred (CF (ListField fs') lo hi) m = return maxPred
       where
-        fs      = filter (`idelem` (unQ m)) [CF f' lo hi | f'<-fs']
-        maxPred = case catMaybes $ map (`idpred` m) fs of
-                    [] -> Nothing
-                    ps -> Just . maximum $ ps
+        cfs     = [CF f' lo hi | f'<-fs']
+        (as,bs) = partition ((>=m).fromJust.fst)
+                . filter (isJust . fst)
+                $ zip (map idlast cfs) cfs
+        maxPred = case catMaybes $ map ((`idpred` m) . snd) as of
+                    []   -> case map fst bs of
+                              [] -> Nothing
+                              xs -> maximum xs
+                    sucs -> Just (maximum sucs)
 
     dpred (CF f@(StepField _ _) _ _) _ 
       = error $ "dpred(CronField): Unimplemented " ++ show f
@@ -126,10 +132,16 @@ instance Dimension BCronField where
 
     dsucc (CF (ListField fs') lo hi) m = return minSucc
       where
-        fs      = filter (`idelem` (unQ m)) [CF f' lo hi | f'<-fs']
-        minSucc = case catMaybes $ map (`idsucc` m) fs of
-                    [] -> Nothing
-                    ps -> Just . minimum $ ps
+        cfs     = [CF f' lo hi | f'<-fs']
+        (as,bs) = partition ((<=m).fromJust.fst)
+                . filter (isJust . fst)
+                $ zip (map idfirst cfs) cfs
+        minSucc = case catMaybes $ map ((`idsucc` m) . snd) as of
+                    []   -> case map fst bs of
+                              [] -> Nothing
+                              xs -> minimum xs
+                    sucs -> Just (minimum sucs)
+
 
     dsucc (CF f@(StepField _ _) _ _) _ 
       = error $ "dsucc(CronField): Unimplemented " ++ show f
