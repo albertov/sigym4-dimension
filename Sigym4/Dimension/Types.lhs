@@ -415,24 +415,47 @@ iterar las dimensiones interiores para pasar a la exterior.
 >       where combineFst b' = findWith (dfirst da) (dsucc db) b'
 >                         >>= maybe stopIteration (uncurry combine)
 
+Las utilidades que acabamos de utilizar.
+
+> findWith :: (DimensionIx (Dependent d) ~ t3, DimensionIx (Dependent d2) ~ t3)
+>   => Dim d1 (Maybe t)
+>   -> (DDimensionIx d1 -> Dim d2 (Maybe (DDimensionIx d1)))
+>   -> DDimensionIx d1
+>   -> Dim d (Maybe (t, DDimensionIx d1))
 > findWith f g = loop maxTryIfNoBound
 >   where
 >     loop 0 _ = stopIteration
 >     loop n v | isJust (runDim f v) = return $ Just (fromJust (runDim f v), v)
 >              | otherwise  = withDep (g v) >>= maybe stopIteration (loop (n-1))
 
-Las utilidades que acabamos de utilizar.
 
+> withDep :: (DimensionIx (Dependent d1) ~ t2, DimensionIx (Dependent d) ~ t2)
+>   => Dim d1 b -> Dim d b
 > withDep d = getDep >>= return . runDim d
->
+
+
+> withSucc, withPred ::
+>   ( Dimension d1, DimensionIx (Dependent d) ~ t2
+>   , DimensionIx (Dependent d1) ~ t2)
+>   => d1
+>   -> Quantized (DimensionIx d1)
+>   -> (Quantized (DimensionIx d1) -> Dim d (Maybe a))
+>   -> Dim d (Maybe a)
 > withSucc d v f = withDep (dsucc d v) >>= maybe stopIteration f
 > withPred d v f = withDep (dpred d v) >>= maybe stopIteration f
->
-> iyieldWithLast da b
->   = maybe stopIteration (`combine` b) (irunDim (dlast da))
+
+
+> iyieldWithFirst, iyieldWithLast :: (BoundedDimension d1, Dependent d1 ~ ())
+>   => d1
+>   -> Quantized t
+>   -> Dim d (Maybe (Quantized (DimensionIx d1 :* t)))
 > iyieldWithFirst da b
 >   = maybe stopIteration (`combine` b) (irunDim (dfirst da))
->
+> iyieldWithLast da b
+>   = maybe stopIteration (`combine` b) (irunDim (dlast da))
+
+
+> combine :: Quantized ts -> Quantized t -> Dim d (Maybe (Quantized (ts :* t)))
 > combine a b = yieldQuant (unQ a :* unQ b)
 
 
