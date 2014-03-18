@@ -62,6 +62,14 @@ spec = do
         let sched = "0 0 31 2 *" :: CronSchedule
         idfloor sched (datetime 2012 3 1 0 0) `shouldBe` Nothing
 
+      it "handles corner case" $ do
+        let sched = "31 */21 6-31 */3 1" :: CronSchedule
+            t1    = datetime 2115 06 28 21 48
+            t2    = datetime 2115 08 30 20 54
+            ft1   = idfloor sched t1
+            ft2   = idfloor sched t2
+        ft1 <= ft2
+
     describe "leap years" $ do
       it "returns only feb 29" $ do
         let sched  = "0 0 29 2 *" :: CronSchedule
@@ -78,7 +86,6 @@ spec = do
             ts = takeSample . map unQ . idenumUp sched $ datetime 2012 3 1 0 0
                               
         length ts `shouldBe` sampleLen
-        all  (idelem sched) ts `shouldBe` True
         all  matches ts `shouldBe` True
 
       describe "idsucc" $ do
@@ -225,8 +232,8 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            let sample = takeSample $ idenumUp d i
-            in not (null sample) ==> all ((idelem d) . unQ) sample
+            let elems = takeSample $ idenumUp d i
+            in not (null elems) ==> all ((idelem d) . unQ) elems
 
     it "returns sorted elements" $ property $
         \((d::dim), i) ->
@@ -243,8 +250,8 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
     it "returns only elements of dimension" $ property $
         \((d::dim), i) ->
-            let sample = takeSample $ idenumDown d i
-            in not (null sample) ==> all ((idelem d) . unQ) sample
+            let elems = takeSample $ idenumDown d i
+            in not (null elems) ==> all ((idelem d) . unQ) elems
 
     it "returns reversely sorted elements" $ property $
         \((d::dim), i) ->

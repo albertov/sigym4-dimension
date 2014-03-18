@@ -213,8 +213,8 @@ instance BoundedDimension BCronField where
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
     dfirst (CF (RangeField a _) lo hi)
-      | a>=lo, a<=hi = yieldQuant a
-      | otherwise    = stopIteration
+      | a<=hi     = yieldQuant $ max lo a
+      | otherwise = stopIteration
     dfirst (CF (ListField fs) lo hi)
       = case catMaybes . map (\f -> idfirst (CF f lo hi)) $ fs of
           [] -> stopIteration
@@ -233,8 +233,8 @@ instance BoundedDimension BCronField where
       | lo<=i,i<=hi = yieldQuant i
       | otherwise   = stopIteration
     dlast  (CF (RangeField _ b) lo hi)
-      | b>=lo, b<=hi = yieldQuant b
-      | otherwise    = stopIteration
+      | b>=lo      = yieldQuant $ min hi b
+      | otherwise  = stopIteration
     dlast (CF (ListField fs) lo hi)
       = case catMaybes . map (\f -> idlast (CF f lo hi)) $ fs of
           [] -> stopIteration
