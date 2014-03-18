@@ -11,14 +11,12 @@ module Sigym4.Dimension.CronSchedule (
 
 import Data.Attoparsec.Text (parseOnly)
 import Data.String (IsString(fromString))
-import Data.Maybe (catMaybes, fromJust, isJust)
 import System.Cron
 import System.Cron.Parser (cronSchedule)
 import Data.Time.Clock (UTCTime(..))
 import Data.Time.Calendar          (toGregorian, fromGregorian, isLeapYear)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
-import Data.List (partition)
 
 import Sigym4.Dimension.Types
 
@@ -48,6 +46,10 @@ qadaptMaybeTime f = fmap ndimIxToTime . f . qtimeToDimIx
 
 data BCronField = CF CronField Int Int deriving Show
 
+toCFs :: BCronField -> [BCronField]
+toCFs (CF (ListField fs) lo hi) = [CF f lo hi | f<-fs]
+toCFs _ = error "toCFs is only defined for CF (ListField)"
+
 instance Dimension BCronField where
     type DimensionIx BCronField = Int
     type Dependent BCronField = ()
@@ -56,8 +58,7 @@ instance Dimension BCronField where
     delem (CF Star lo hi) m = return $ lo<=m && m<=hi
     delem (CF (SpecificField i) lo hi) m = return $ inInt lo hi m && m==i
     delem (CF (RangeField a b) lo hi) m = return $ inInt (max lo a) (min hi b) m
-    delem (CF (ListField fs) lo hi) m
-      = return $ any (\f -> idelem (CF f lo hi) m) fs
+    delem f@(CF (ListField _) _ _) m = withDep (toCFs f `delem` m)
     delem (CF (StepField Star s) lo hi) m
       = return $ inInt lo hi m && m `mod` s == 0
     delem (CF (StepField (RangeField a b) s) lo hi) m
@@ -88,17 +89,7 @@ instance Dimension BCronField where
       = yieldHead . dropWhile (>= unQ m) . reverse $ expand (max lo a)
                                                             (min hi b) s 
 
-    dpred (CF (ListField fs') lo hi) m = return maxPred
-      where
-        cfs     = [CF f' lo hi | f'<-fs']
-        (as,bs) = partition ((>=m).fromJust.fst)
-                . filter (isJust . fst)
-                $ zip (map idlast cfs) cfs
-        maxPred = case catMaybes $ map ((`idpred` m) . snd) as of
-                    []   -> case map fst bs of
-                              [] -> Nothing
-                              xs -> maximum xs
-                    sucs -> Just (maximum sucs)
+    dpred f@(CF (ListField _) _ _) m = withDep (toCFs f `dpred` m)
 
     dpred (CF f@(StepField _ _) _ _) _ 
       = error $ "dpred(CronField): Unimplemented " ++ show f
@@ -125,18 +116,7 @@ instance Dimension BCronField where
     dsucc (CF (StepField (RangeField a b) s) lo hi) m
       = yieldHead . dropWhile (<= unQ m) $ expand (max lo a) (min hi b) s
 
-    dsucc (CF (ListField fs') lo hi) m = return minSucc
-      where
-        cfs     = [CF f' lo hi | f'<-fs']
-        (as,bs) = partition ((<=m).fromJust.fst)
-                . filter (isJust . fst)
-                $ zip (map idfirst cfs) cfs
-        minSucc = case catMaybes $ map ((`idsucc` m) . snd) as of
-                    []   -> case map fst bs of
-                              [] -> Nothing
-                              xs -> minimum xs
-                    sucs -> Just (minimum sucs)
-
+    dsucc f@(CF (ListField _) _ _) m = withDep (toCFs f `dsucc` m)
 
     dsucc (CF f@(StepField _ _) _ _) _ 
       = error $ "dsucc(CronField): Unimplemented " ++ show f
@@ -162,12 +142,7 @@ instance Dimension BCronField where
     dfloor (CF (StepField (RangeField a b) s) lo hi) m
       = yieldHead . dropWhile (>m) . reverse $ expand (max lo a) (min hi b) s
 
-    dfloor (CF (ListField fs') lo hi) m = maxFloor
-      where
-        fs       = [CF f' lo hi | f'<-fs']
-        maxFloor = case catMaybes $ map (`idfloor` m) fs of
-                    [] -> stopIteration
-                    ps -> yieldQuant . maximum . filter (<= m) . map unQ $ ps
+    dfloor f@(CF (ListField _) _ _) m = withDep (toCFs f `dfloor` m)
 
     dfloor (CF f@(StepField _ _) _ _) _ 
       = error $ "dfloor(CronField): Unimplemented " ++ show f
@@ -194,12 +169,7 @@ instance Dimension BCronField where
     dceiling (CF (StepField (RangeField a b) s) lo hi) m
       = yieldHead . dropWhile (<m) $ expand (max lo a) (min hi b) s
 
-    dceiling (CF (ListField fs') lo hi) m = minCeil
-      where
-        fs      = [CF f' lo hi | f'<-fs']
-        minCeil = case catMaybes $ map (`idceiling` m) fs of
-                    [] -> stopIteration
-                    ps -> yieldQuant . minimum . filter (>= m) . map unQ $ ps
+    dceiling f@(CF (ListField _) _ _) m = withDep (toCFs f `dceiling` m)
 
     dceiling (CF f@(StepField _ _) _ _) _
       = error $ "dceiling(CronField): Unimplemented " ++ show f
@@ -217,10 +187,7 @@ instance BoundedDimension BCronField where
       | otherwise = stopIteration
       where lo' = max lo a
             hi' = min hi b
-    dfirst (CF (ListField fs) lo hi)
-      = case catMaybes . map (\f -> idfirst (CF f lo hi)) $ fs of
-          [] -> stopIteration
-          ls -> yieldQuant . unQ . minimum $ ls
+    dfirst f@(CF (ListField _) _ _) = withDep $ dfirst $ toCFs f
     dfirst (CF (StepField Star s) lo hi)
       = case expand lo hi s of
           []    -> stopIteration
@@ -239,10 +206,7 @@ instance BoundedDimension BCronField where
       | otherwise = stopIteration
       where lo' = max lo a
             hi' = min hi b
-    dlast (CF (ListField fs) lo hi)
-      = case catMaybes . map (\f -> idlast (CF f lo hi)) $ fs of
-          [] -> stopIteration
-          ls -> yieldQuant . unQ . maximum $ ls
+    dlast f@(CF (ListField _) _ _) = withDep $ dlast $ toCFs f
     dlast (CF (StepField Star s) lo hi)
       = yieldHead . reverse $ expand lo hi s
     dlast  (CF (StepField (RangeField a b) s) lo  hi)

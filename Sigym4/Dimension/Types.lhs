@@ -57,6 +57,7 @@ Se define el interfaz del módulo...
 >   -- | * Utilidades para instancias de 'Dimension'
 >   , Dim
 >   , getDep
+>   , withDep
 >   , runDim
 >   , irunDim
 >   , quant
@@ -66,12 +67,13 @@ Se define el interfaz del módulo...
 
 ... y se importan las librerías necesarias:
 
-> import Control.Monad.Loops (unfoldrM)
+> import Control.Monad.Loops (unfoldrM, anyM)
 > import Control.Monad.Reader (Reader, runReader, ask)
 > import Control.Applicative (Applicative)
 > import Data.Typeable (Typeable)
-> import Data.Maybe (isJust, fromJust)
+> import Data.Maybe (catMaybes, isJust, fromJust)
 > import qualified Data.Set as S
+> import Data.List (partition)
 
 Dimension
 ---------
@@ -519,7 +521,7 @@ Los productos `:~` de dos `BoundedDimension` es a su vez una `BoundedDimension`
 >         (Just fa', Just fb') -> combine fa' fb'
 >         _                    -> stopIteration
 
-Los productos `:+` también.
+Los productos `:*` también.
 
 > instance (BoundedDimension a, BoundedDimension b, Dependent a ~ ())
 >   => BoundedDimension (a :* b)
@@ -561,3 +563,59 @@ Podermos definir trivialmente cualquier conjunto `Data.Set.Set` como una
 >             | otherwise = yieldQuant . S.findMax $ s
 >    denum  = return . map Quant . S.toAscList
 >    denumr = return . map Quant . S.toDescList
+
+
+Listas
+------
+
+Definimos una lista de `Dimension`es como una `Dimensión`:
+
+> instance BoundedDimension a => Dimension [a] where
+>    type DimensionIx [a] = DimensionIx a
+>    type Dependent [a]   = Dependent a
+>    delem    ds i = anyM (withDep . (`delem` i)) ds
+>    dpred    ds i = do
+>       (as, bs) <- fmap ( partition ((>=i) . fromJust . fst)
+>                        . filter (isJust . fst)
+>                        . (`zip` ds)
+>                        ) (mapM (withDep . dlast) ds)
+>       preds    <- fmap catMaybes $ mapM (withDep . (`dpred` i) . snd) as
+>       return $ case preds of
+>                  []   -> case map fst bs of
+>                           [] -> Nothing
+>                           xs -> maximum xs
+>                  xs   -> Just $ maximum xs
+>    dsucc    ds i = do
+>       (as, bs) <- fmap ( partition ((<=i) . fromJust . fst)
+>                        . filter (isJust . fst)
+>                        . (`zip` ds)
+>                        ) (mapM (withDep . dfirst) ds)
+>       preds    <- fmap catMaybes $ mapM (withDep . (`dsucc` i) . snd) as
+>       return $ case preds of
+>                  []   -> case map fst bs of
+>                           [] -> Nothing
+>                           xs -> minimum xs
+>                  xs   -> Just $ minimum xs
+>    dfloor   ds i = do
+>      floors <- fmap catMaybes$ mapM (withDep . (`dfloor` i)) ds
+>      case floors of
+>        [] -> stopIteration
+>        xs -> yieldQuant . maximum . filter (<=i) . map unQ $ xs
+>    dceiling ds i = do
+>      ceils <- fmap catMaybes $ mapM (withDep . (`dceiling` i)) ds
+>      case ceils of
+>        [] -> stopIteration
+>        xs -> yieldQuant . minimum . filter (>=i) . map unQ $ xs
+
+
+> instance BoundedDimension a => BoundedDimension [a] where
+>    dfirst ds = do
+>      firsts <- fmap catMaybes $ mapM (withDep . dfirst) ds
+>      case firsts of
+>        [] -> stopIteration
+>        xs -> return . Just $ minimum xs
+>    dlast ds = do
+>      lasts <- fmap catMaybes $ mapM (withDep . dlast) ds
+>      case lasts of
+>        [] -> stopIteration
+>        xs -> return . Just $ maximum xs
