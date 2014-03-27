@@ -18,7 +18,7 @@ library
                    , Sigym4.Dimension.Time
                    , Sigym4.Dimension.CronSchedule
   -- other-extensions:    
-  build-depends:     base >=4.7 && <5
+  build-depends:     base >=4.6 && <5
                    , monad-loops
                    , mtl
                    , attoparsec
