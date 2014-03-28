@@ -23,6 +23,7 @@ library
                    , mtl
                    , attoparsec
                    , containers
+                   , deepseq
                    , cron
                    , time
                     
@@ -34,7 +35,7 @@ library
                      -funbox-strict-fields
                      -O2
 
-test-suite main
+test-suite test
   type:              exitcode-stdio-1.0
   build-depends:     base
                    , time
@@ -48,3 +49,18 @@ test-suite main
   main-is:           Spec.hs
   default-language:  Haskell2010
   ghc-options:       -Wall -O2
+
+benchmark bench
+  type:              exitcode-stdio-1.0
+  hs-source-dirs:    bench
+  main-is:           Main.hs
+  build-depends:     base
+                   , containers
+                   , time
+                   , cron
+                   , attoparsec
+                   , sigym4-dimension
+                   , deepseq
+                   , criterion
+  default-language:  Haskell2010
+  ghc-options:      -Wall -O2

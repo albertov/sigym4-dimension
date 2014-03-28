@@ -29,6 +29,7 @@ porque no se pueden expresar con Haskell2010.
 >            , FlexibleContexts
 >            , FlexibleInstances
 >            , ScopedTypeVariables
+>            , BangPatterns
 >            #-}
 > 
 
@@ -70,6 +71,7 @@ Se define el interfaz del módulo...
 > import Control.Monad.Loops (unfoldrM, anyM)
 > import Control.Monad.Reader (Reader, runReader, ask)
 > import Control.Applicative (Applicative)
+> import Control.DeepSeq (NFData)
 > import Data.Typeable (Typeable)
 > import Data.Maybe (catMaybes, isJust, fromJust)
 > import qualified Data.Set as S
@@ -123,7 +125,7 @@ mismo tipo de dimensión pero distintas (TODO: estudiar como prevenirlo con
 los tipos sin introducir chequeos en ejecución)
 
 > newtype Quantized a = Quant {unQ :: a}
->   deriving (Eq, Ord, Show, Functor, Typeable)
+>   deriving (Eq, Ord, Show, Functor, NFData, Typeable)
 >
 
 Definimos un alias para referirnos al tipo de índice cuantizado de la
@@ -144,17 +146,20 @@ de `Dimension`
 > --   Signals that there is a valid next value.
 > --   Used to implement 'Dimension' instances.
 > yieldQuant :: a -> Dim d (Maybe (Quantized a))
-> yieldQuant = return . Just . Quant
+> yieldQuant !q = return . Just . Quant $ q
+> {-# INLINE yieldQuant #-}
 >
 > -- | Wraps a Nothing in 'Maybe Quantized' and lifts it to the 'Dim' monad
 > --   Signals that there are no more valid values.
 > --   Used to implement 'Dimension' instances.
 > stopIteration :: Dim d (Maybe a)
 > stopIteration = return Nothing
+> {-# INLINE stopIteration #-}
 >
 > -- | Wraps a value in 'Quantized' and lifts it to the 'Dim' monad
 > quant :: a -> Dim d (Quantized a)
-> quant = return . Quant
+> quant !q = return . Quant $ q
+> {-# INLINE quant #-}
 >
 > -- | Asks for the 'DimensionIx' of the dependent 'Dimension' from the
 > --   environment
