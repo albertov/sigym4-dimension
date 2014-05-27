@@ -17,6 +17,7 @@ Tiempos
 >   , ObservationTime
 >   , RunTime
 >   , Horizon (..)
+>   , minutes
 >   , Horizons
 >   , DynHorizons
 >   , Schedule (..)
