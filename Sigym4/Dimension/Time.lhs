@@ -20,6 +20,7 @@ Tiempos
 >   , minutes
 >   , Horizons
 >   , DynHorizons
+>   , fromList
 >   , Schedule (..)
 > ) where
 
