@@ -6,6 +6,7 @@ Tiempos
 >            , StandaloneDeriving
 >            , DeriveDataTypeable
 >            , TypeFamilies
+>            , TypeOperators
 >            , TypeSynonymInstances
 >            , FlexibleInstances
 >            #-}
@@ -15,12 +16,15 @@ Tiempos
 >     Time(..)
 >   , ForecastTime
 >   , ObservationTime
+>   , Prediction
+>   , PredictionDyn
 >   , RunTime
 >   , Horizon (..)
 >   , minutes
 >   , Horizons
 >   , DynHorizons
 >   , Schedule (..)
+>   , fromList
 > ) where
 
 > import Data.String (IsString(fromString))
@@ -286,3 +290,9 @@ ascendentemente!
 >
 > getHs :: (DimensionIx (Dependent d) -> b) -> Dim d b
 > getHs f = getDep >>= return . f . unQ
+
+Definimos aliases de tipo de dimensiones compuestas comunes para no tener que
+habilitar TypeOperators en los clientes.
+
+> type Prediction = Horizons :* Schedule RunTime
+> type PredictionDyn = DynHorizons :* Schedule RunTime
