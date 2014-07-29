@@ -25,7 +25,6 @@ Tiempos
 >   , DynHorizons
 >   , fromList
 >   , Schedule (..)
->   , fromList
 > ) where
 
 > import Data.String (IsString(fromString))
