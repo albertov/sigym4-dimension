@@ -23,6 +23,7 @@ Tiempos
 >   , minutes
 >   , Horizons
 >   , DynHorizons
+>   , fromList
 >   , Schedule (..)
 >   , fromList
 > ) where
