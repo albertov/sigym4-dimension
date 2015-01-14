@@ -30,6 +30,7 @@ porque no se pueden expresar con Haskell2010.
 >            , FlexibleInstances
 >            , ScopedTypeVariables
 >            , BangPatterns
+>            , CPP
 >            #-}
 > 
 
@@ -70,7 +71,9 @@ Se define el interfaz del módulo...
 
 > import Control.Monad.Loops (unfoldrM, anyM)
 > import Control.Monad.Reader (Reader, runReader, ask)
+#if !MIN_VERSION_base(4,8,0)
 > import Control.Applicative (Applicative)
+#endif
 > import Control.DeepSeq (NFData)
 > import Data.Typeable (Typeable)
 > import Data.Maybe (catMaybes, isJust, fromJust)

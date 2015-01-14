@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Criterion.Main hiding (defaultOptions)
-import Criterion.Config
+import Criterion.Main
 import Control.DeepSeq
 import Data.Time.Clock
 import Data.Time.Calendar
@@ -9,16 +8,9 @@ import Data.Time.Calendar
 import Sigym4.Dimension
 import Sigym4.Dimension.CronSchedule
 
-benchConfig :: Config
-benchConfig = defaultConfig {
-    cfgPerformGC = ljust True
-  , cfgSamples = ljust 3
-  }
-
-
 main :: IO ()
 main = do
-  defaultMainWith benchConfig (return ()) [
+  defaultMain [
       benchSched "* * * * *" 
     , benchSched "0 0 * * *" 
     , benchSched "0 */6 * * *" 

@@ -10,7 +10,6 @@
 module Sigym4.DimensionSpec (main, spec) where
 import Control.Applicative
 import Test.Hspec
-import Test.Hspec.QuickCheck
 import Data.Time.Calendar
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.Clock

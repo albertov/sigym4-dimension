@@ -9,6 +9,7 @@ Tiempos
 >            , TypeOperators
 >            , TypeSynonymInstances
 >            , FlexibleInstances
+>            , CPP
 >            #-}
 > 
 
@@ -23,7 +24,6 @@ Tiempos
 >   , minutes
 >   , Horizons
 >   , DynHorizons
->   , fromList
 >   , Schedule (..)
 > ) where
 
@@ -32,7 +32,9 @@ Tiempos
 > import Data.Time ()
 > import Data.Typeable (Typeable)
 > import qualified Data.Set as S
+#if !MIN_VERSION_containers(0,5,6)
 > import GHC.Exts (IsList (..))
+#endif
 > import Sigym4.Dimension.Types
 > import Sigym4.Dimension.CronSchedule
 
@@ -235,6 +237,8 @@ O(log n) en vez de O(n) en `dpred`, `dsucc`, `dfloor` y `dceiling`.
 
 > type Horizons = S.Set Horizon
 
+#if !MIN_VERSION_containers(0,5,6)
+
 Definimos una instancia de `IsList` para poder escribir constantes como listas
 habilitando la extension `XOverloadedLists`. Ojo, dará error en tiempo de
 ejecución una lista vacía, también se puede arreglar con TemplateHaskell.
@@ -245,7 +249,8 @@ ejecución una lista vacía, también se puede arreglar con TemplateHaskell.
 >         | null l    = error "fromList(Horizons): Cannot be an empty list"
 >         | otherwise = S.fromList l
 >     toList  = S.toAscList
- 
+#endif
+
 Horizontes dinámicos
 --------------------
 
