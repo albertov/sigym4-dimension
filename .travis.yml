@@ -39,9 +39,7 @@ script:
  - export SRC_TGZ=$(cabal info . | awk '{print $2 ".tar.gz";exit}') ;
    cd dist/;
    if [ -f "$SRC_TGZ" ]; then
-# FIXME: Remove when upstream cron accepts https://github.com/MichaelXavier/cron/pull/12 and makes a release
-      cabal sandbox init --sandbox=../.cabal-sandbox
-# endFIXME
+      cabal sandbox init --sandbox=../.cabal-sandbox # FIXME: remove when... (see above)
       cabal install --force-reinstalls "$SRC_TGZ";
    else
       echo "expected '$SRC_TGZ' not found";
