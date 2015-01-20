@@ -1,3 +1,0 @@
-[submodule "submodules/cron"]
-	path = submodules/cron
-	url = https://github.com/albertov/cron.git

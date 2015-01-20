@@ -30,7 +30,7 @@ library
                    , attoparsec
                    , containers
                    , deepseq
-                   , cron
+                   , cron >= 0.2.5
                    , time
                     
   -- hs-source-dirs:      
