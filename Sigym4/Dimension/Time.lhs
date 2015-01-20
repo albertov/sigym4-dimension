@@ -17,6 +17,7 @@ Tiempos
 >     Time(..)
 >   , ForecastTime
 >   , ObservationTime
+>   , Observation
 >   , Prediction
 >   , PredictionDyn
 >   , RunTime
@@ -299,5 +300,6 @@ ascendentemente!
 Definimos aliases de tipo de dimensiones compuestas comunes para no tener que
 habilitar TypeOperators en los clientes.
 
+> type Observation = Schedule ObservationTime
 > type Prediction = Horizons :* Schedule RunTime
 > type PredictionDyn = DynHorizons :* Schedule RunTime
