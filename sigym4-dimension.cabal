@@ -7,7 +7,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Alberto Valverde
 maintainer:          alberto@meteogrid.com
-copyright:           2014-2015 Alberto Valverde Gonzalez
+copyright:           2014-2016 Alberto Valverde Gonzalez
 category:            Data
 build-type:          Simple
 -- extra-source-files:  
@@ -21,8 +21,8 @@ source-repository head
 library
   exposed-modules:   Sigym4.Dimension
                    , Sigym4.Dimension.Types
-                   , Sigym4.Dimension.Time
-                   , Sigym4.Dimension.CronSchedule
+                   --, Sigym4.Dimension.Time
+                   --, Sigym4.Dimension.CronSchedule
   -- other-extensions:    
   build-depends:     base >=4.6 && <5
                    , monad-loops
@@ -30,7 +30,7 @@ library
                    , attoparsec
                    , containers
                    , deepseq
-                   , cron >= 0.2.5
+                   , iso8601-duration
                    , time
                     
   -- hs-source-dirs:      
@@ -44,7 +44,6 @@ test-suite test
   type:              exitcode-stdio-1.0
   build-depends:     base
                    , time
-                   , cron
                    , hspec
                    , QuickCheck
                    , attoparsec
@@ -62,7 +61,6 @@ benchmark bench
   build-depends:     base
                    , containers
                    , time
-                   , cron
                    , attoparsec
                    , sigym4-dimension
                    , deepseq
