@@ -64,6 +64,7 @@ module Sigym4.Dimension.Types (
   , runDim
   , irunDim
   , quant
+  , mapQuant
   , yieldQuant
   , stopIteration
   , overDim
@@ -190,8 +191,13 @@ stopIteration = return Nothing
 
 -- | Wraps a value in 'Quantized' and lifts it to the 'Dim' monad
 quant :: a -> Dim d (Quantized a)
-quant q = return . Quant $ q
+quant = return . Quant
 {-# INLINE quant #-}
+
+-- | Wraps a list of values in 'Quantized' and lifts it to the 'Dim' monad
+mapQuant :: [a] -> Dim d [Quantized a]
+mapQuant = return . map Quant
+{-# INLINE mapQuant #-}
 
 -- | Asks for the 'DimensionIx' of the dependent 'Dimension' from the
 --   environment

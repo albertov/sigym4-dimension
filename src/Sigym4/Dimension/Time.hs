@@ -29,6 +29,7 @@ module Sigym4.Dimension.Time (
   , interval
   , boundedInterval
   , intq
+  , intrtq
   , parseInterval
   , iterateDuration
   , module Data.Time
@@ -38,6 +39,7 @@ module Sigym4.Dimension.Time (
 
 import           Sigym4.Dimension.Types
 
+import           Control.Applicative
 import           Control.Newtype
 import           Data.Attoparsec.ByteString (Parser)
 import           Data.Attoparsec.ByteString.Char8 as AP hiding (takeWhile)
@@ -209,6 +211,20 @@ instance (Show t, Ord t, Newtype t UTCTime) => Dimension (Interval t) where
     next <- fmap unQ <$> dceiling (StartDuration s d) t
     maybe stopIteration (yieldQuant . min e) next
 
+  denumUp (StartDuration    s   d') a =
+    mapQuant . dropWhile (< a) $ iterateDuration d' s
+  denumUp (StartEndDuration    _  e _ ) a | a>e = return []
+  denumUp (StartEndDuration    s  e d') a =
+    mapQuant . takeWhile (<=e) . dropWhile (< a) $ iterateDuration d' s
+  -- FIXME: This one is quite inefficient!
+
+  denumDown (StartDuration    s   _ ) a | a<s = return []
+  denumDown (StartDuration    s   d') a =
+    mapQuant . reverse . takeWhile (<= a) $ iterateDuration d' s
+  denumDown (StartEndDuration    s e _ ) a | a<s = return []
+  denumDown (StartEndDuration    s e d') a =
+    mapQuant . reverse . takeWhile (<= min a e) $ iterateDuration d' s
+  -- FIXME: This one is quite inefficient!
 
 elemMonotonic :: Ord a => a -> [a] -> Bool
 elemMonotonic a = go where
@@ -405,16 +421,31 @@ type PredictionDyn = DynHorizons :* Interval RunTime
 
 
 
-unsafeParseInterval :: Newtype t UTCTime => BS.ByteString -> Interval t
+unsafeParseInterval :: (Ord t, Newtype t UTCTime) => BS.ByteString -> Interval t
 unsafeParseInterval =
   either (error . ("Could not parse Interval: "++)) id . parseInterval
 
-parseInterval :: Newtype t UTCTime => BS.ByteString -> Either String (Interval t)
+parseInterval
+  :: forall t. (Ord t, Newtype t UTCTime)
+  => BS.ByteString -> Either String (Interval t)
 parseInterval = parseOnly (interval' <* endOfInput) where
   interval' :: Newtype t UTCTime => Parser (Interval t)
-  interval' = undefined
+  interval' = bounded <|> unbounded
+  bounded, unbounded :: Parser (Interval t)
+  bounded = do
+    s <- pack <$> I.isoTime <* char '/'
+    e <- pack <$> I.isoTime <* char '/'
+    d <- duration
+    either fail return (boundedInterval d s e)
+  unbounded = do
+    s <- pack <$> I.isoTime <* char '/'
+    d <- duration
+    either fail return (interval d s)
 
-intq :: forall t. Newtype t UTCTime => Proxy t -> QuasiQuoter
+intrtq :: QuasiQuoter
+intrtq = intq (Proxy :: Proxy RunTime)
+
+intq :: forall t. (Ord t, Newtype t UTCTime) => Proxy t -> QuasiQuoter
 intq _ = QuasiQuoter
   { quoteExp = \s -> do
       either fail (\(_::Interval t) -> return ()) (parseInterval (BS.pack s))

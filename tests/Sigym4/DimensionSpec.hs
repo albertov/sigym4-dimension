@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings
            , ScopedTypeVariables
+           , QuasiQuotes
            , TypeOperators
            , TypeFamilies
            , FlexibleContexts
@@ -51,36 +52,17 @@ spec = do
   dimensionSpec "Horizons :* Interval RunTime"
                 (Proxy :: Proxy (Horizons :* Interval RunTime))
 
-
-{-
-  context "CronSchedule" $ do
-    {- El modélo está mal. No trata el 0 como domingo
-    describe "idelem" $ do
-      it "behaves like model" $ property $
-        \(s, t) -> s `idelem` t == s `scheduleMatches` t
-    -}
-
-    describe "idfloor" $ do
-      it "does not crash on impossible schedule" $ do
-        let sched = "0 0 31 2 *" :: CronSchedule
-        idfloor sched (datetime 2012 3 1 0 0) `shouldBe` Nothing
-
-      it "handles corner case" $ do
-        let sched = "31 */21 6-31 */3 1" :: CronSchedule
-            t1    = datetime 2115 06 28 21 48
-            t2    = datetime 2115 08 30 20 54
-            ft1   = idfloor sched t1
-            ft2   = idfloor sched t2
-        ft1 <= ft2
+  describe "hand picked cases" $ do
 
     describe "leap years" $ do
       it "returns only feb 29" $ do
-        let sched  = "0 0 29 2 *" :: CronSchedule
-            Just t = idfloor sched (datetime 2012 3 1 0 0)
-        unQ t `shouldBe` datetime 2012 2 29 0 0
-        fmap unQ (idsucc sched t) `shouldBe` Just (datetime 2016 2 29 0 0)
-        fmap unQ (idpred sched t) `shouldBe` Just (datetime 2008 2 29 0 0)
+        let d  = [intrtq|20080229/P4Y|]
+            Just t = idfloor d (datetimeRT 2012 3 1 0 0)
+        unQ t `shouldBe` datetimeRT 2012 2 29 0 0
+        fmap unQ (idsucc d t) `shouldBe` Just (datetimeRT 2016 2 29 0 0)
+        fmap unQ (idpred d t) `shouldBe` Just (datetimeRT 2008 2 29 0 0)
 
+{-
       it "returns only feb 29 on monday" $ do
         let sched     = "0 0 29 2 1" :: CronSchedule
             matches (UTCTime d _) = let (_,m,dom) = toGregorian d
@@ -275,6 +257,10 @@ datetime :: Int -> Int -> Int -> Int -> Int -> UTCTime
 datetime y m d h mn
   = UTCTime (fromGregorian (fromIntegral y) m d) (fromIntegral (h*60+mn)*60)
 
+datetimeRT :: Int -> Int -> Int -> Int -> Int -> RunTime
+datetimeRT y m d h = RunTime . datetime y m d h
+
+
 data Proxy a = Proxy
 
 
@@ -301,18 +287,20 @@ instance Arbitrary Day where
 
 arbitraryStart :: Newtype t UTCTime => Gen t
 arbitraryStart = pack <$> (UTCTime <$> arbitraryDayInRange 2000 2009
-                                   <*> arbitraryNDT)
+                                   <*> arbitraryDT)
 
 
+arbitraryDayInRange :: Integer -> Integer -> Gen Day
 arbitraryDayInRange s e = ModifiedJulianDay . fromIntegral <$> choose (day0, day1)
   where
     ModifiedJulianDay day0 = fromGregorian s 1 1
     ModifiedJulianDay day1 = fromGregorian e 1 1
 
 instance Arbitrary UTCTime where
-    arbitrary = UTCTime <$> arbitrary <*> arbitraryNDT
+    arbitrary = UTCTime <$> arbitrary <*> arbitraryDT
 
-arbitraryNDT = fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int)
+arbitraryDT :: Gen DiffTime
+arbitraryDT = fromIntegral <$> (choose (0, 24*3600-1) :: Gen Int)
 
 instance (Arbitrary a, Arbitrary b) => Arbitrary (a :* b) where
     arbitrary = (:*) <$> arbitrary <*> arbitrary
@@ -326,9 +314,9 @@ instance Arbitrary Horizons where
                    fromList <$> vectorOf n arbitrary
 
 instance Arbitrary Horizon where
-    arbitrary = oneof [ Minute <$> choose (0,1000)
-                      , Hour   <$> choose (0,1000)
-                      , Day    <$> choose (0,1000)]
+    arbitrary = oneof [ Minute <$> choose (-1000,1000)
+                      , Hour   <$> choose (-1000,1000)
+                      , Day    <$> choose (-1000,1000)]
 
 nub :: (Ord a) => [a] -> [a]
 nub = go S.empty
