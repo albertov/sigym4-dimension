@@ -1,6 +1,6 @@
 { mkDerivation, attoparsec, base, bytestring, containers, deepseq
 , hspec, iso8601-duration, monad-loops, mtl, newtype, QuickCheck
-, stdenv, template-haskell, time
+, stdenv, template-haskell, time, cron
 }:
 mkDerivation {
   pname = "sigym4-dimension";
@@ -8,7 +8,7 @@ mkDerivation {
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base bytestring containers deepseq iso8601-duration
-    monad-loops mtl newtype template-haskell time
+    monad-loops mtl newtype template-haskell time cron
   ];
   testHaskellDepends = [
     attoparsec base containers hspec QuickCheck time

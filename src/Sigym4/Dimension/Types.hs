@@ -135,7 +135,7 @@ import Data.Coerce (Coercible, coerce)
 -- los tipos sin introducir chequeos en ejecución)
 -- 
 newtype Quantized a = Quant {unQ :: a}
-  deriving (Eq, Ord, Functor, NFData, Typeable)
+  deriving (Eq, Ord, Show, Functor, NFData, Typeable)
 
 -- 
 -- Definimos un alias para referirnos al tipo de índice cuantizado de la

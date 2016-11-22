@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 import Criterion.Main
 import Control.DeepSeq
@@ -11,12 +12,12 @@ import Sigym4.Dimension.CronSchedule
 main :: IO ()
 main = do
   defaultMain [
-      benchSched "* * * * *" 
-    , benchSched "0 0 * * *" 
-    , benchSched "0 */6 * * *" 
-    , benchSched "0 0,6,12,18 * * *" 
-    , benchSched "0 0 29 2 *" 
-    , benchSched "0 0 29 2 1" 
+      benchSched [cron|* * * * *|]
+    , benchSched [cron|0 0 * * *|]
+    , benchSched [cron|0 */6 * * *|]
+    , benchSched [cron|0 0,6,12,18 * * *|]
+    , benchSched [cron|0 0 29 2 *|]
+    , benchSched [cron|0 0 29 2 1|]
     ]
 
 benchSched :: CronSchedule -> Benchmark

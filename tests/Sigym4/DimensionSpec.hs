@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings
+           , TemplateHaskell
            , ScopedTypeVariables
            , QuasiQuotes
            , TypeOperators
@@ -14,6 +15,10 @@ module Sigym4.DimensionSpec (main, spec) where
 
 import Sigym4.Dimension
 import Sigym4.Dimension.Time
+import Sigym4.Dimension.CronSchedule
+
+import System.Cron hiding (Schedule)
+import System.Cron.Parser (cronSchedule)
 
 import Control.Applicative
 import Control.Newtype
@@ -44,15 +49,34 @@ spec :: Spec
 spec = do
   dimensionSpec "Infinite Int" (Proxy :: Proxy (Infinite Int))
 
-  dimensionSpec "Interval ObservationTime"
-                (Proxy :: Proxy (Interval ObservationTime))
+  dimensionSpec "Schedule ObservationTime"
+                (Proxy :: Proxy (Schedule ObservationTime))
 
   dimensionSpec "Horizons" (Proxy :: Proxy Horizons)
 
-  dimensionSpec "Horizons :* Interval RunTime"
-                (Proxy :: Proxy (Horizons :* Interval RunTime))
+  dimensionSpec "Horizons :* Schedule RunTime"
+                (Proxy :: Proxy (Horizons :* Schedule RunTime))
 
-  describe "hand picked cases" $ do
+  context "CronSchedule" $ do
+    {- El modélo está mal. No trata el 0 como domingo
+    describe "idelem" $ do
+      it "behaves like model" $ property $
+        \(s, t) -> s `idelem` t == s `scheduleMatches` t
+    -}
+
+    describe "idfloor" $ do
+      it "does not crash on impossible schedule" $ do
+        let sched = [cron|0 0 31 2 *|]
+        idfloor sched (datetime 2012 3 1 0 0) `shouldBe` Nothing
+
+      it "handles corner case" $ do
+        let sched = [cron|31 */21 6-31 */3 1|]
+            t1    = datetime 2115 06 28 21 48
+            t2    = datetime 2115 08 30 20 54
+            ft1   = idfloor sched t1
+            ft2   = idfloor sched t2
+        ft1 <= ft2
+
 
     describe "leap years" $ do
       it "returns only feb 29" $ do
@@ -62,9 +86,8 @@ spec = do
         fmap unQ (idsucc d t) `shouldBe` Just (datetimeRT 2016 2 29 0 0)
         fmap unQ (idpred d t) `shouldBe` Just (datetimeRT 2008 2 29 0 0)
 
-{-
       it "returns only feb 29 on monday" $ do
-        let sched     = "0 0 29 2 1" :: CronSchedule
+        let sched     = [cron|0 0 29 2 1|]
             matches (UTCTime d _) = let (_,m,dom) = toGregorian d
                                         (_,_,dow) = toWeekDate d
                                     in dow == 1 && m==2 && dom==29
@@ -75,28 +98,27 @@ spec = do
 
       describe "idsucc" $ do
         it "returns day 29" $ do
-          let sched  = "0 0 * * *" :: CronSchedule
+          let sched  = [cron|0 0 * * *|]
               Just t = idfloor sched (datetime 2012 2 28 0 0)
               Just s = idsucc sched t
           unQ s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
-          let sched  = "0 0 * * *" :: CronSchedule
+          let sched  = [cron|0 0 * * *|]
               Just t = idfloor sched (datetime 2012 2 29 0 0)
               Just s = idsucc sched t
           unQ s `shouldBe` datetime 2012 3 1 0 0
 
       describe "idpred" $ do
         it "returns day 29" $ do
-          let sched  = "0 0 * * *" :: CronSchedule
+          let sched  = [cron|0 0 * * *|]
               Just t = idfloor sched (datetime 2012 3 1 0 0)
               Just s = idpred sched t
           unQ s `shouldBe` datetime 2012 2 29 0 0
         it "accepts day 29" $ do
-          let sched  = "0 0 * * *" :: CronSchedule
+          let sched  = [cron|0 0 * * *|]
               Just t = idfloor sched (datetime 2012 2 29 0 0)
               Just s = idpred sched t
           unQ s `shouldBe` datetime 2012 2 28 0 0
-  -}
              
 
 -- | Una especificación que comprueba que se cumplen las propiedades de
@@ -107,12 +129,13 @@ dimensionSpec :: forall dim.
   => String -> Proxy dim -> Spec
 dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idsucc" $ do
-    it "returns an element strictly greater" $ property $
-        \((d::dim), i) ->
-        let c      = idceiling d i
-            f      = idsucc d (fromJust c)
-            Just v = f
-        in isJust c && isJust f ==> unQ v `compare` i == GT
+    it "returns an element strictly greater" $ property $ \((d::dim), i) ->
+      let c      = idceiling d i
+          f      = idsucc d (fromJust c)
+          Just v = f
+      in isJust c && isJust f ==>
+        counterexample (show (d,i,c)) $
+          unQ v `compare` i == GT
 
     it "application preserves ordering" $ property $
         \((d::dim), getOrdered -> elems) ->
@@ -135,12 +158,13 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
   describe "idpred" $ do
 
-    it "returns an element strictly smaller" $ property $
-        \((d::dim), i) ->
-        let c      = idfloor d i
-            f      = idpred d (fromJust c)
-            Just v = f
-        in isJust c && isJust f ==> unQ v `compare` i == LT
+    it "returns an element strictly smaller" $ property $ \((d::dim), i) ->
+      let c      = idfloor d i
+          f      = idpred d (fromJust c)
+          Just v = f
+      in isJust c && isJust f ==>
+        counterexample (show (d,i,c)) $
+          unQ v `compare` i == LT
 
     it "application preserves ordering" $ property $
         \((d::dim), getOrdered -> elems) ->
@@ -163,15 +187,15 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
 
 
   describe "idfloor" $ do
-    it "returns an element belonging to set" $ property $
-        \((d::dim), i) ->
-        let c = idfloor d i
-        in isJust c ==> idelem d (unQ (fromJust c))
+    it "returns an element belonging to set" $ property $ \((d::dim), i) ->
+      let c = idfloor d i in isJust c ==>
+        counterexample (show (d,i,c)) $
+          idelem d (unQ (fromJust c))
 
-    it "returns an element LT or EQ" $ property $
-        \((d::dim), i) ->
-        let c = idfloor d i
-        in isJust c ==> (unQ (fromJust c) `compare` i) `elem` [LT,EQ]
+    it "returns an element LT or EQ" $ property $ \((d::dim), i) ->
+      let c = idfloor d i in isJust c ==>
+        counterexample (show (d,i,c)) $
+          (unQ (fromJust c) `compare` i) `elem` [LT,EQ]
 
     it "application preserves ordering" $ property $
         \((d::dim), getOrdered -> elems) ->
@@ -190,18 +214,17 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
             ((fa `compare` fc) `elem` [EQ, LT])
 
   describe "idceiling" $ do
-    it "returns an element belonging to set" $ property $
-        \((d::dim), i) ->
-        let c = idceiling d i
-        in isJust c ==> idelem d (unQ (fromJust c))
+    it "returns an element belonging to set" $ property $ \((d::dim), i) ->
+      let c = idceiling d i in isJust c ==>
+        counterexample (show (d,i,c)) $
+          idelem d (unQ (fromJust c))
 
-    it "returns an element GT or EQ" $ property $
-        \((d::dim), i) ->
-        let c = idceiling d i
-        in isJust c ==> (unQ (fromJust c) `compare` i) `elem` [GT,EQ]
+    it "returns an element GT or EQ" $ property $ \((d::dim), i) ->
+      let c = idceiling d i in isJust c ==>
+        counterexample (show (d,i,c)) $
+          (unQ (fromJust c) `compare` i) `elem` [GT,EQ]
 
-    it "application preserves ordering" $ property $
-        \((d::dim), (a,b,c)) ->
+    it "application preserves ordering" $ property $ \((d::dim), (a,b,c)) ->
           let fa'     = idceiling d a
               fb'     = idceiling d b
               fc'     = idceiling d c
@@ -318,12 +341,6 @@ instance Arbitrary Horizon where
                       , Hour   <$> choose (-1000,1000)
                       , Day    <$> choose (-1000,1000)]
 
-nub :: (Ord a) => [a] -> [a]
-nub = go S.empty
-  where go _ [] = []
-        go s (x:xs) | S.member x s = go s xs
-                    | otherwise    = x : go (S.insert x s) xs
-
 
 instance Arbitrary DurSecond where arbitrary = DurSecond <$> (getPositive <$> arbitrary)
 instance Arbitrary DurMinute where arbitrary = DurMinute <$> choose (5,7200) <*> pure Nothing
@@ -358,3 +375,75 @@ instance (Ord t, Newtype t UTCTime, Arbitrary t) => Arbitrary (Interval t) where
                 r <- getPositive <$> arbitrary
                 let e = iterateDuration p s !! r
                 return (boundedInterval p s e)
+
+instance Arbitrary (Schedule t) where
+    arbitrary = Schedule <$> arbitrary
+
+isParseable :: CronSchedule -> Bool
+isParseable (CronSchedule a b c d e) = isRight p
+  where p = parseOnly cronSchedule $ fromString s
+        s = unwords [show a, show b, show c, show d, show e]
+
+instance Arbitrary CronSchedule where
+    arbitrary = cronschedule >>= \s -> if isValid s then return s else arbitrary
+      where
+        isValid  = isParseable
+        cronschedule = CronSchedule <$> arbitrary
+                                    <*> arbitrary
+                                    <*> arbitrary
+                                    <*> arbitrary
+                                    <*> arbitrary
+
+instance Arbitrary DayOfWeekSpec where
+    arbitrary = DaysOfWeek <$> arbitraryCronField (1,7)
+instance Arbitrary DayOfMonthSpec where
+    arbitrary = DaysOfMonth <$> arbitraryCronField (1,31)
+instance Arbitrary MonthSpec where
+    arbitrary = Months <$> arbitraryCronField (1,12)
+instance Arbitrary MinuteSpec where
+    arbitrary = Minutes <$> arbitraryCronField (0,59)
+instance Arbitrary HourSpec where
+    arbitrary = Hours <$> arbitraryCronField (0,23)
+
+arbitraryCronField :: (Int,Int) -> Gen CronField
+arbitraryCronField range
+  = oneof [ Field <$> star
+          , Field <$> specificField
+          , stepField
+          , Field <$> rangeField
+          , listField
+          ]
+  where
+    specificField :: Gen BaseField
+    specificField = SpecificField' . SpecificField <$> choose range
+
+    star :: Gen BaseField
+    star = pure Star
+
+    rangeField :: Gen BaseField
+    rangeField = do
+        lo <- choose range
+        hi <- choose range
+        if lo<hi
+        then return . RangeField' $ RangeField lo hi
+        else rangeField
+
+    listField :: Gen CronField
+    listField = (ListField . fromList)
+            <$> listOf1 (oneof [ star
+                               , specificField
+                               , rangeField
+                               ])
+
+    stepField :: Gen CronField
+    stepField = StepField' <$> (StepField  <$> oneof [star, rangeField]
+                                           <*> choose ( max 1 (fst range)
+                                                      , snd range))
+
+
+nub :: (Ord a) => [a] -> [a]
+nub = go S.empty
+  where go _ [] = []
+        go s (x:xs) | S.member x s = go s xs
+                    | otherwise    = x : go (S.insert x s) xs
+

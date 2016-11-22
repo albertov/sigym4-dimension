@@ -26,18 +26,24 @@ module Sigym4.Dimension.Time (
   , Horizons (..)
   , DynHorizons
   , Interval
+  , Schedule (..)
+  , forecastSchedule
+  , observationSchedule
   , interval
   , boundedInterval
   , intq
   , intrtq
   , parseInterval
   , iterateDuration
+  -- * Re-exports
+  , Newtype
   , module Data.Time
   , module Data.Time.ISO8601.Duration
-  , Newtype
+  , module Sigym4.Dimension.CronSchedule
 ) where
 
 import           Sigym4.Dimension.Types
+import           Sigym4.Dimension.CronSchedule
 
 import           Control.Applicative
 import           Control.Newtype
@@ -103,6 +109,33 @@ truncateToSecond (unpack -> UTCTime d t) =
 -- 
 -- Periodicidad
 -- ------------
+--
+--
+--
+newtype Schedule t = Schedule { unSchedule :: CronSchedule }
+  deriving (Eq, Show)
+
+forecastSchedule :: CronSchedule -> Schedule RunTime
+forecastSchedule = Schedule
+
+observationSchedule :: CronSchedule -> Schedule ObservationTime
+observationSchedule = Schedule
+
+
+instance Newtype (Schedule t) CronSchedule where
+  pack   = Schedule
+  unpack = unSchedule
+
+instance ( Ord t, Coercible t UTCTime, Coercible (Schedule t) CronSchedule)
+  => Dimension (Schedule t) where
+  type DimensionIx (Schedule t) = t
+  type Dependent (Schedule t)   = ()
+  delem = overDim delem
+  dsucc = overDim dsucc
+  dpred = overDim dpred
+  dfloor = overDim dfloor
+  dceiling = overDim dceiling
+
 -- 
 -- Definimos un tipo para poder definir índices temporales periódicos.
 -- NB: No usamos Data.Time.ISO8601.Interval porque puede representar estados
@@ -143,7 +176,7 @@ belongsToInterval d s e =
 -- de lo que más duele. Se podría mejorar inspeccionando el `Duration` y
 -- adaptando el delta en 'denumFromTo' una vez se encuentra un punto válido.
 -- 
-instance (Show t, Ord t, Newtype t UTCTime) => Dimension (Interval t) where
+instance (Ord t, Newtype t UTCTime) => Dimension (Interval t) where
   type DimensionIx (Interval t) = t
   type Dependent   (Interval t) = ()
 
@@ -414,9 +447,9 @@ getHs f = getDep >>= return . f . unQ
 -- Definimos aliases de tipo de dimensiones compuestas comunes para no tener que
 -- habilitar TypeOperators en los clientes.
 -- 
-type Observation = Interval ObservationTime
-type Prediction = Horizons :* Interval RunTime
-type PredictionDyn = DynHorizons :* Interval RunTime
+type Observation = Schedule ObservationTime
+type Prediction = Horizons :* Schedule RunTime
+type PredictionDyn = DynHorizons :* Schedule RunTime
 
 
 

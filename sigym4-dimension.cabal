@@ -22,6 +22,7 @@ library
   exposed-modules:   Sigym4.Dimension
                    , Sigym4.Dimension.Types
                    , Sigym4.Dimension.Time
+                   , Sigym4.Dimension.CronSchedule
   hs-source-dirs:    src
   -- other-extensions:    
   build-depends:     base >=4.6 && <5
@@ -33,6 +34,7 @@ library
                    , deepseq
                    , iso8601-duration
                    , time
+                   , cron
                    , template-haskell
                    , newtype
                     
@@ -53,6 +55,7 @@ test-suite test
                    , containers
                    , iso8601-duration
                    , newtype
+                   , cron
                    , sigym4-dimension
   other-modules:     Sigym4.DimensionSpec
   hs-source-dirs:    tests
