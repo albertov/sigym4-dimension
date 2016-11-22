@@ -31,6 +31,7 @@
            , ScopedTypeVariables
            , BangPatterns
            , CPP
+           , Trustworthy
            #-}
 
 -- 
@@ -65,6 +66,8 @@ module Sigym4.Dimension.Types (
   , quant
   , yieldQuant
   , stopIteration
+  , overDim
+  , overDim_
 ) where
 -- 
 -- ... y se importan las librerías necesarias:
@@ -75,10 +78,13 @@ import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Applicative (Applicative)
 -- #endif
 import Control.DeepSeq (NFData)
+import Control.Newtype
 import Data.Typeable (Typeable)
 import Data.Maybe (catMaybes, isJust, fromJust)
 import qualified Data.Set as S
 import Data.List (partition)
+import Data.Coerce (Coercible, coerce)
+
 -- 
 -- Dimension
 -- ---------
@@ -128,7 +134,7 @@ import Data.List (partition)
 -- los tipos sin introducir chequeos en ejecución)
 -- 
 newtype Quantized a = Quant {unQ :: a}
-  deriving (Eq, Ord, Show, Functor, NFData, Typeable)
+  deriving (Eq, Ord, Functor, NFData, Typeable)
 
 -- 
 -- Definimos un alias para referirnos al tipo de índice cuantizado de la
@@ -145,11 +151,34 @@ type DDimensionIx d = Quantized (DimensionIx (Dependent d))
 newtype Dim d a = Dim {unDim :: Reader (DDimensionIx d) a}
   deriving (Functor, Applicative, Monad)
 
+hoistDim :: Coercible (DDimensionIx d) (DDimensionIx d') => Dim d a -> Dim d' a
+hoistDim = coerce
+{-# INLINE hoistDim #-}
+
+
+overDim
+  :: ( Coercible (DimensionIx (Dependent d)) (DimensionIx (Dependent d'))
+     , Coercible d d'
+     , Coercible a a'
+     , Coercible b b'
+     , Newtype d' d -- redundant constraint to propagate the fundep: d' -> d
+     )
+  => (d -> a -> Dim d b) -> (d' -> a' -> Dim d' b')
+overDim f s = fmap coerce . coerce f s
+{-# INLINE overDim #-}
+
+
+overDim_
+  :: (DimensionIx (Dependent d) ~ DimensionIx (Dependent d'), Newtype n t) =>
+  (t -> Dim d a) -> n -> Dim d' a
+overDim_ f s = hoistDim $ f (unpack s)
+{-# INLINE overDim_ #-}
+
 -- | Wraps a value in 'Maybe Quantized' and lifts it to the 'Dim' monad
 --   Signals that there is a valid next value.
 --   Used to implement 'Dimension' instances.
 yieldQuant :: a -> Dim d (Maybe (Quantized a))
-yieldQuant !q = return . Just . Quant $ q
+yieldQuant q = return . Just . Quant $ q
 {-# INLINE yieldQuant #-}
 
 -- | Wraps a Nothing in 'Maybe Quantized' and lifts it to the 'Dim' monad
@@ -161,7 +190,7 @@ stopIteration = return Nothing
 
 -- | Wraps a value in 'Quantized' and lifts it to the 'Dim' monad
 quant :: a -> Dim d (Quantized a)
-quant !q = return . Quant $ q
+quant q = return . Quant $ q
 {-# INLINE quant #-}
 
 -- | Asks for the 'DimensionIx' of the dependent 'Dimension' from the
@@ -189,8 +218,7 @@ qZ = Quant ()
 --  A finite dimension should also implement 'BoundedDimension' and
 -- return 'Nothing' from 'dpred', 'dfloor', 'dsucc' and 'dceiling' when
 -- the next element would be > maximum or < minimum
-class (Show d, Show (DimensionIx d), Eq (DimensionIx d), Ord (DimensionIx d))
-  => Dimension d
+class Ord (DimensionIx d) => Dimension d
   where
     -- | The associated type of the elements
     type DimensionIx d
@@ -317,9 +345,9 @@ instance BoundedDimension () where
 -- También definimos una instancia para usar cualquier tipo numérico como
 -- dimensión "infinita".
 -- 
-data Infinite a = Inf deriving Show
+data Infinite a = Inf deriving (Show, Eq)
 
-instance (Show a, Num a, Ord a, Bounded a) => Dimension (Infinite a) where
+instance (Num a, Ord a, Bounded a) => Dimension (Infinite a) where
     type DimensionIx (Infinite a) = a
     type Dependent   (Infinite a) = ()
 
@@ -546,6 +574,7 @@ instance (BoundedDimension a, BoundedDimension b, Dependent a ~ ())
       case (fa,fb) of
         (Just fa', Just fb') -> combine fa' fb'
         _                    -> stopIteration
+
 -- 
 -- 
 -- Conjuntos
@@ -554,7 +583,7 @@ instance (BoundedDimension a, BoundedDimension b, Dependent a ~ ())
 -- Podermos definir trivialmente cualquier conjunto `Data.Set.Set` como una
 -- `BoundedDimension`.
 -- 
-instance (Show a, Ord a) => Dimension (S.Set a) where
+instance Ord a => Dimension (S.Set a) where
    type DimensionIx (S.Set a) = a
    type Dependent (S.Set a)   = ()
    delem s e    = return $ S.member e s
@@ -563,7 +592,7 @@ instance (Show a, Ord a) => Dimension (S.Set a) where
    dfloor s e   = return . fmap Quant $ S.lookupLE e s
    dceiling s e = return . fmap Quant $ S.lookupGE e s
 -- 
-instance (Show a, Ord a) => BoundedDimension (S.Set a) where
+instance Ord a => BoundedDimension (S.Set a) where
    dfirst s | S.null s  = stopIteration
             | otherwise = yieldQuant . S.findMin $ s
    dlast  s | S.null s  = stopIteration

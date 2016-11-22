@@ -21,17 +21,20 @@ source-repository head
 library
   exposed-modules:   Sigym4.Dimension
                    , Sigym4.Dimension.Types
-                   --, Sigym4.Dimension.Time
-                   --, Sigym4.Dimension.CronSchedule
+                   , Sigym4.Dimension.Time
+  hs-source-dirs:    src
   -- other-extensions:    
   build-depends:     base >=4.6 && <5
                    , monad-loops
                    , mtl
                    , attoparsec
+                   , bytestring
                    , containers
                    , deepseq
                    , iso8601-duration
                    , time
+                   , template-haskell
+                   , newtype
                     
   -- hs-source-dirs:      
   default-language:  Haskell2010
@@ -48,7 +51,10 @@ test-suite test
                    , QuickCheck
                    , attoparsec
                    , containers
+                   , iso8601-duration
+                   , newtype
                    , sigym4-dimension
+  other-modules:     Sigym4.DimensionSpec
   hs-source-dirs:    tests
   main-is:           Spec.hs
   default-language:  Haskell2010
