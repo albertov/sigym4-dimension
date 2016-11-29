@@ -5,6 +5,8 @@
            , TypeOperators
            , RecordWildCards
            #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 module Sigym4.Dimension.CronSchedule (
    CronSchedule
  , cron
@@ -13,6 +15,7 @@ module Sigym4.Dimension.CronSchedule (
 
 import Sigym4.Dimension.Types
 
+import           Control.DeepSeq (NFData(rnf))
 import Control.Monad
 import Data.Attoparsec.Text (parseOnly, endOfInput)
 import Data.Foldable (toList)
@@ -23,6 +26,7 @@ import Data.Time.Clock (UTCTime(..))
 import Data.Time.Calendar          (toGregorian, fromGregorian, isLeapYear)
 import Data.Time.Calendar.WeekDate (toWeekDate)
 import Data.Time.LocalTime         (TimeOfDay(..), timeToTimeOfDay)
+import           GHC.Generics (Generic)
 
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
@@ -37,6 +41,7 @@ instance Dimension CronSchedule where
     dsucc    s = return . qadaptMaybeTime (idsucc (scheduleToDim s))
     dfloor   s = return . adaptMaybeTime (idfloor (scheduleToDim s))
     dceiling s = return . adaptMaybeTime (idceiling (scheduleToDim s))
+
 
 adaptMaybeTime :: (TimeIx -> Maybe (Quantized TimeIx))
                -> UTCTime
@@ -393,3 +398,27 @@ cron = QuasiQuoter
   , quoteType = const (fail "Cannot apply cron quasiquoter in types")
   , quoteDec  = const (fail "Cannot apply cron quasiquoter in declarations")
   }
+
+
+deriving instance Generic SpecificField
+deriving instance Generic RangeField
+deriving instance Generic DayOfMonthSpec
+deriving instance Generic MonthSpec
+deriving instance Generic HourSpec
+deriving instance Generic StepField
+deriving instance Generic BaseField
+deriving instance Generic DayOfWeekSpec
+deriving instance Generic CronSchedule
+deriving instance Generic CronField
+deriving instance Generic MinuteSpec
+instance NFData SpecificField
+instance NFData RangeField
+instance NFData DayOfMonthSpec
+instance NFData MonthSpec
+instance NFData HourSpec
+instance NFData StepField
+instance NFData BaseField
+instance NFData DayOfWeekSpec
+instance NFData MinuteSpec
+instance NFData CronField
+instance NFData CronSchedule

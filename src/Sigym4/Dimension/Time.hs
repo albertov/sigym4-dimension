@@ -2,7 +2,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -23,6 +22,7 @@ module Sigym4.Dimension.Time (
   , PredictionDyn
   , Horizon (..)
   , minutes
+  , addHorizon
   , Horizons (..)
   , DynHorizons
   , Interval
@@ -33,6 +33,7 @@ module Sigym4.Dimension.Time (
   , boundedInterval
   , intq
   , intrtq
+  , coerceTime
   , parseInterval
   , iterateDuration
   -- * Re-exports
@@ -46,6 +47,7 @@ import           Sigym4.Dimension.Types
 import           Sigym4.Dimension.CronSchedule
 
 import           Control.Applicative
+import           Control.DeepSeq (NFData(rnf))
 import           Control.Newtype
 import           Data.Attoparsec.ByteString (Parser)
 import           Data.Attoparsec.ByteString.Char8 as AP hiding (takeWhile)
@@ -55,7 +57,6 @@ import           Data.Coerce (Coercible, coerce)
 import           Data.Time
 import           Data.Time.ISO8601.Duration
 import qualified Data.Time.ISO8601.Interval as I
-import           Debug.Trace
 
 import Data.Typeable (Typeable)
 import qualified Data.Set as S
@@ -73,7 +74,7 @@ import Language.Haskell.TH.Quote
 -- 
 --
 newtype ObservationTime = ObservationTime { getObservationTime :: UTCTime }
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Typeable, NFData)
 
 instance Newtype ObservationTime UTCTime where
   pack = ObservationTime
@@ -84,7 +85,7 @@ instance Newtype ObservationTime UTCTime where
 -- predictivo.
 -- 
 newtype RunTime = RunTime { getRunTime :: UTCTime }
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Typeable, NFData)
 
 instance Newtype RunTime UTCTime where
   pack = RunTime
@@ -95,7 +96,7 @@ instance Newtype RunTime UTCTime where
 -- predictivo, es decir, la hora a la cual se predice una situación.
 -- 
 newtype ForecastTime = ForecastTime { getForecastTime :: UTCTime }
-  deriving (Eq, Ord, Show, Typeable)
+  deriving (Eq, Ord, Show, Typeable, NFData)
 
 instance Newtype ForecastTime UTCTime where
   pack = ForecastTime
@@ -113,7 +114,8 @@ truncateToSecond (unpack -> UTCTime d t) =
 --
 --
 newtype Schedule t = Schedule { unSchedule :: CronSchedule }
-  deriving (Eq, Show)
+  deriving (Eq, Show, NFData)
+
 
 forecastSchedule :: CronSchedule -> Schedule RunTime
 forecastSchedule = Schedule
@@ -291,6 +293,11 @@ data Horizon = Minute !Minutes
              | Hour   !Int
              | Day    !Int
   deriving (Show, Read, Typeable)
+
+instance NFData Horizon where
+  rnf (Minute _) = ()
+  rnf (Hour _) = ()
+  rnf (Day _) = ()
 -- 
 -- Definimos los minutos que contiene cada tipo de horizonte para poder normalizar
 -- y operar con ellos.
@@ -346,9 +353,22 @@ instance Num Horizon where
     signum (Day    a)   = Day    (signum a)
 
     fromInteger         = Minute . fromInteger
--- 
+
+-- | Instancia de Enum para poder escribir "[0,60,..24*60]"
+--   en vez de "map minutes [0,60,..24*60]"
+instance Enum Horizon where
+  toEnum   = fromIntegral
+  fromEnum = minutes
+
+coerceTime :: (Coercible t1 UTCTime, Coercible UTCTime t2)
+           => t1 -> t2
+coerceTime = coerce
+
 toNominalDiffTime :: Horizon -> NominalDiffTime
 toNominalDiffTime = fromIntegral . (* 60) . minutes
+
+addHorizon :: Newtype t UTCTime => Horizon -> t -> t
+addHorizon h = pack . addUTCTime (toNominalDiffTime h) . unpack
 -- 
 -- Horizontes fijos
 -- -----------------
@@ -364,7 +384,7 @@ toNominalDiffTime = fromIntegral . (* 60) . minutes
 -- O(log n) en vez de O(n) en `dpred`, `dsucc`, `dfloor` y `dceiling`.
 -- 
 newtype Horizons = Horizons { getHorizons :: S.Set Horizon }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Typeable, NFData)
 
 
 instance Dimension Horizons where
