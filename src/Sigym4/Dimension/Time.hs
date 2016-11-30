@@ -114,7 +114,8 @@ truncateToSecond (unpack -> UTCTime d t) =
 --
 --
 newtype Schedule t = Schedule { unSchedule :: CronSchedule }
-  deriving (Eq, Show, NFData)
+  deriving (Eq, NFData)
+instance Show (Schedule t) where show = show . unSchedule
 
 
 forecastSchedule :: CronSchedule -> Schedule RunTime
@@ -292,7 +293,17 @@ type Minutes = Int
 data Horizon = Minute !Minutes
              | Hour   !Int
              | Day    !Int
-  deriving (Show, Read, Typeable)
+  deriving Typeable
+
+instance Show Horizon where
+  show (Minute 0) = "0"
+  show (Minute s) = show s ++ "m"
+  show (Hour   0) = "0"
+  show (Hour   s) = show s ++ "h"
+  show (Day    0) = "0"
+  show (Day    s) = show s ++ "d"
+
+
 
 instance NFData Horizon where
   rnf (Minute _) = ()
@@ -384,7 +395,9 @@ addHorizon h = pack . addUTCTime (toNominalDiffTime h) . unpack
 -- O(log n) en vez de O(n) en `dpred`, `dsucc`, `dfloor` y `dceiling`.
 -- 
 newtype Horizons = Horizons { getHorizons :: S.Set Horizon }
-  deriving (Eq, Show, Typeable, NFData)
+  deriving (Eq, Typeable, NFData)
+
+instance Show Horizons where show = show . S.toAscList . getHorizons
 
 
 instance Dimension Horizons where
