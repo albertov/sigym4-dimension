@@ -73,12 +73,12 @@ module Sigym4.Dimension.Types (
 -- 
 -- ... y se importan las librerías necesarias:
 -- 
+import Control.DeepSeq (NFData(rnf))
 import Control.Monad.Loops (unfoldrM, anyM)
 import Control.Monad.Reader (Reader, runReader, ask)
 -- #if !MIN_VERSION_base(4,8,0)
 import Control.Applicative (Applicative)
 -- #endif
-import Control.DeepSeq (NFData)
 import Control.Newtype
 import Data.Typeable (Typeable)
 import Data.Maybe (catMaybes, isJust, fromJust)
@@ -398,6 +398,9 @@ instance (Ord a, Ord b) => Ord (a :* b) where
       = case b `compare` b' of
           EQ -> a `compare` a'
           o  -> o
+
+instance (NFData a, NFData b) => NFData (a :* b) where
+    rnf (a :* b) = seq (rnf a) (rnf b)
 -- 
 -- Definimos cualquier producto de dimensiones como una dimensión.
 -- 

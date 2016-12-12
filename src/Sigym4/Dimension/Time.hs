@@ -34,6 +34,7 @@ module Sigym4.Dimension.Time (
   , intq
   , intrtq
   , coerceTime
+  , datetime
   , parseInterval
   , iterateDuration
   -- * Re-exports
@@ -75,6 +76,10 @@ import Language.Haskell.TH.Quote
 --
 newtype ObservationTime = ObservationTime { getObservationTime :: UTCTime }
   deriving (Eq, Ord, Show, Typeable, NFData)
+
+instance Newtype UTCTime UTCTime where
+  pack = id
+  unpack = id
 
 instance Newtype ObservationTime UTCTime where
   pack = ObservationTime
@@ -515,8 +520,20 @@ intq :: forall t. (Ord t, Newtype t UTCTime) => Proxy t -> QuasiQuoter
 intq _ = QuasiQuoter
   { quoteExp = \s -> do
       either fail (\(_::Interval t) -> return ()) (parseInterval (BS.pack s))
-      return (TH.VarE 'unsafeParseInterval `TH.AppE` (TH.LitE (TH.StringL s)))
+      return (TH.VarE 'unsafeParseInterval `TH.AppE` TH.LitE (TH.StringL s))
   , quotePat  = const (fail "Cannot apply interval quasiquoter in patterns")
   , quoteType = const (fail "Cannot apply interval quasiquoter in types")
   , quoteDec  = const (fail "Cannot apply interval quasiquoter in declarations")
   }
+
+type Year = Integer
+type Month = Int
+type Day' = Int
+type Hour = Int
+type Minute' = Int
+
+datetime :: Newtype t UTCTime
+         => Year -> Month -> Day' -> Hour -> Minute' -> t
+datetime y m d h mn
+  = pack (UTCTime (fromGregorian y m d) (fromIntegral (h * 60 + mn) * 60))
+{-# INLINE datetime #-}

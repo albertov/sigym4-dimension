@@ -31,6 +31,7 @@ import qualified Data.Set as S
 import Data.Maybe (isJust, fromJust)
 import Data.Either (isRight)
 import Data.String (fromString)
+import Data.Proxy
 import Data.Attoparsec.Text (parseOnly)
 import Test.QuickCheck
 import GHC.Exts (fromList)
@@ -81,10 +82,10 @@ spec = do
     describe "leap years" $ do
       it "returns only feb 29" $ do
         let d  = [intrtq|20080229/P4Y|]
-            Just t = idfloor d (datetimeRT 2012 3 1 0 0)
-        unQ t `shouldBe` datetimeRT 2012 2 29 0 0
-        fmap unQ (idsucc d t) `shouldBe` Just (datetimeRT 2016 2 29 0 0)
-        fmap unQ (idpred d t) `shouldBe` Just (datetimeRT 2008 2 29 0 0)
+            Just t = idfloor d (datetime 2012 3 1 0 0)
+        unQ t `shouldBe` (datetime 2012 2 29 0 0  :: RunTime)
+        fmap unQ (idsucc d t) `shouldBe` Just (datetime 2016 2 29 0 0)
+        fmap unQ (idpred d t) `shouldBe` Just (datetime 2008 2 29 0 0)
 
       it "returns only feb 29 on monday" $ do
         let sched     = [cron|0 0 29 2 1|]
@@ -129,61 +130,52 @@ dimensionSpec :: forall dim.
   => String -> Proxy dim -> Spec
 dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idsucc" $ do
-    it "returns an element strictly greater" $ property $ \((d::dim), i) ->
+    it "returns an element strictly greater" $ property $ \(d::dim, i) ->
       let c      = idceiling d i
           f      = idsucc d (fromJust c)
           Just v = f
       in isJust c && isJust f ==>
         counterexample (show (d,i,c)) $
-          unQ v `compare` i == GT
+          unQ v > i
 
     it "application preserves ordering" $ property $
-        \((d::dim), getOrdered -> elems) ->
+        \(d::dim, getOrdered -> elems) ->
           let (c:b:a:_) = elems
               fa'     = idceiling d a
               fb'     = idceiling d b
               fc'     = idceiling d c
-              fa''    = (idsucc d) =<< fa'
-              fb''    = (idsucc d) =<< fb'
-              fc''    = (idsucc d) =<< fc'
+              fa''    = idsucc d =<< fa'
+              fb''    = idsucc d =<< fb'
+              fc''    = idsucc d =<< fc'
               Just fa = fa''
               Just fb = fb''
               Just fc = fc''
           in length elems >= 3 && isJust fa'' && isJust fb'' && isJust fc'' ==>
-              ((fa `compare` fb) /= LT)
-                &&
-              ((fb `compare` fc) /= LT)
-                &&
-              ((fa `compare` fc) /= LT)
+              (fa >= fb) && (fb >= fc) && (fa >= fc)
 
   describe "idpred" $ do
 
-    it "returns an element strictly smaller" $ property $ \((d::dim), i) ->
+    it "returns an element strictly smaller" $ property $ \(d::dim, i) ->
       let c      = idfloor d i
           f      = idpred d (fromJust c)
           Just v = f
       in isJust c && isJust f ==>
-        counterexample (show (d,i,c)) $
-          unQ v `compare` i == LT
+        counterexample (show (d,i,c)) $ unQ v < i
 
     it "application preserves ordering" $ property $
-        \((d::dim), getOrdered -> elems) ->
+        \(d::dim, getOrdered -> elems) ->
           let (a:b:c:_) = elems
               fa'     = idfloor d a
               fb'     = idfloor d b
               fc'     = idfloor d c
-              fa''    = (idpred d) =<< fa'
-              fb''    = (idpred d) =<< fb'
-              fc''    = (idpred d) =<< fc'
+              fa''    = idpred d =<< fa'
+              fb''    = idpred d =<< fb'
+              fc''    = idpred d =<< fc'
               Just fa = fa''
               Just fb = fb''
               Just fc = fc''
           in length elems >= 3 && isJust fa'' && isJust fb'' && isJust fc'' ==>
-              ((fa `compare` fb) /= GT)
-                &&
-              ((fb `compare` fc) /= GT)
-                &&
-              ((fa `compare` fc) /= GT)
+              (fa <= fb) && (fb <= fc) && (fa <= fc)
 
 
   describe "idfloor" $ do
@@ -192,13 +184,12 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
         counterexample (show (d,i,c)) $
           idelem d (unQ (fromJust c))
 
-    it "returns an element LT or EQ" $ property $ \((d::dim), i) ->
+    it "returns an element <=" $ property $ \(d::dim, i) ->
       let c = idfloor d i in isJust c ==>
-        counterexample (show (d,i,c)) $
-          (unQ (fromJust c) `compare` i) `elem` [LT,EQ]
+        counterexample (show (d,i,c)) $ unQ (fromJust c) <= i
 
     it "application preserves ordering" $ property $
-        \((d::dim), getOrdered -> elems) ->
+        \(d::dim, getOrdered -> elems) ->
           let (a:b:c:_) = elems
               fa'     = idfloor d a
               fb'     = idfloor d b
@@ -207,24 +198,20 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
               Just fb = fb'
               Just fc = fc'
           in length elems > 2 && isJust fa' && isJust fb' && isJust fc'  ==>
-            ((fa `compare` fb) `elem` [EQ, LT])
-              &&
-            ((fb `compare` fc) `elem` [EQ, LT])
-              &&
-            ((fa `compare` fc) `elem` [EQ, LT])
+            (fa <= fb) && (fb <= fc) && (fa <= fc)
 
   describe "idceiling" $ do
-    it "returns an element belonging to set" $ property $ \((d::dim), i) ->
+    it "returns an element belonging to set" $ property $ \(d::dim, i) ->
       let c = idceiling d i in isJust c ==>
         counterexample (show (d,i,c)) $
           idelem d (unQ (fromJust c))
 
-    it "returns an element GT or EQ" $ property $ \((d::dim), i) ->
+    it "returns an element GT or EQ" $ property $ \(d::dim, i) ->
       let c = idceiling d i in isJust c ==>
         counterexample (show (d,i,c)) $
           (unQ (fromJust c) `compare` i) `elem` [GT,EQ]
 
-    it "application preserves ordering" $ property $ \((d::dim), (a,b,c)) ->
+    it "application preserves ordering" $ property $ \(d::dim, (a,b,c)) ->
           let fa'     = idceiling d a
               fb'     = idceiling d b
               fc'     = idceiling d c
@@ -232,26 +219,22 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
               Just fb = fb'
               Just fc = fc'
           in a >= b && b >= c && isJust fa' && isJust fb' && isJust fc'  ==>
-            ((fa `compare` fb) `elem` [EQ, GT])
-              &&
-            ((fb `compare` fc) `elem` [EQ, GT])
-              &&
-            ((fa `compare` fc) `elem` [EQ, GT])
+            (fa >= fb) && (fb >= fc) && (fa >= fc)
 
   describe "idenumUp" $ do
 
     it "returns only elements of dimension" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumUp d i
             in not (null elems) ==> all ((idelem d) . unQ) elems
 
     it "returns sorted elements" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumUp d i
             in L.sort elems == elems
 
     it "does not return duplicate elements" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumUp d i
             in nub elems == elems
 
@@ -259,32 +242,22 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
   describe "idenumDown" $ do
 
     it "returns only elements of dimension" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumDown d i
             in not (null elems) ==> all ((idelem d) . unQ) elems
 
     it "returns reversely sorted elements" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumDown d i
             in L.sort elems == reverse elems
 
     it "does not return duplicate elements" $ property $
-        \((d::dim), i) ->
+        \(d::dim, i) ->
             let elems = takeSample $ idenumUp d i
             in nub elems == elems
 
 
 -- Utilidades
-
-datetime :: Int -> Int -> Int -> Int -> Int -> UTCTime
-datetime y m d h mn
-  = UTCTime (fromGregorian (fromIntegral y) m d) (fromIntegral (h*60+mn)*60)
-
-datetimeRT :: Int -> Int -> Int -> Int -> Int -> RunTime
-datetimeRT y m d h = RunTime . datetime y m d h
-
-
-data Proxy a = Proxy
 
 
 -- A continuación se implementan instancias de Arbitrary de varios tipos
