@@ -368,13 +368,14 @@ instance Num Horizon where
     signum (Hour   a)   = Hour   (signum a)
     signum (Day    a)   = Day    (signum a)
 
-    fromInteger         = Minute . fromInteger
+    fromInteger         = Hour . fromInteger
 
--- | Instancia de Enum para poder escribir "[0,60,..24*60]"
---   en vez de "map minutes [0,60,..24*60]"
+-- | Instancia de Enum para poder escribir "[0..24]"
+--   en vez de "map Hour [0..24]"
 instance Enum Horizon where
-  toEnum   = fromIntegral
-  fromEnum = minutes
+  toEnum            = Hour
+  fromEnum (Hour s) = s
+  fromEnum h        = minutes h `div` 60
 
 coerceTime :: (Coercible t1 UTCTime, Coercible UTCTime t2)
            => t1 -> t2
