@@ -81,9 +81,9 @@ spec = do
 
     describe "leap years" $ do
       it "returns only feb 29" $ do
-        let d  = [intrtq|20080229/P4Y|]
+        let d  = [cron|0 0 29 2 *|]
             Just t = idfloor d (datetime 2012 3 1 0 0)
-        unQ t `shouldBe` (datetime 2012 2 29 0 0  :: RunTime)
+        unQ t `shouldBe` datetime 2012 2 29 0 0
         fmap unQ (idsucc d t) `shouldBe` Just (datetime 2016 2 29 0 0)
         fmap unQ (idpred d t) `shouldBe` Just (datetime 2008 2 29 0 0)
 
