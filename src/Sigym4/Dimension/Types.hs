@@ -381,11 +381,11 @@ instance (Num a, Ord a, Bounded a) => Dimension (Infinite a) where
 -- Para combinar los índices de ambos tipos de dimensiones se utiliza el
 -- operador `:*`
 --  
-infixl 3 :*
+infixr 5 :*
 data ts :* t = !ts :* !t
   deriving (Show, Eq, Read, Typeable)
 -- 
-infixl 3 :~
+infixr 5 :~
 data ts :~ t
         = !ts :~ !t
         deriving (Show, Eq, Read, Typeable)
