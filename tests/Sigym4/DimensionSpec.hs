@@ -17,7 +17,7 @@ import Sigym4.Dimension
 import Sigym4.Dimension.Time
 import Sigym4.Dimension.CronSchedule
 
-import System.Cron hiding (Schedule)
+import System.Cron hiding (Schedule, describe)
 import System.Cron.Parser (cronSchedule)
 
 import Control.Applicative

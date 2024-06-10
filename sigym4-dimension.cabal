@@ -28,6 +28,7 @@ library
   build-depends:     base >=4.6 && <5
                    , monad-loops
                    , mtl
+                   , text
                    , attoparsec
                    , bytestring
                    , containers

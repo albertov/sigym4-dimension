@@ -1,17 +1,17 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Sigym4.Dimension.Time (
     ForecastTime    (..)
@@ -50,12 +50,11 @@ import           Sigym4.Dimension.CronSchedule
 import           Control.Applicative
 import           Control.DeepSeq (NFData(rnf))
 import           Control.Newtype
-import           Data.Attoparsec.ByteString (Parser)
 import           Data.Attoparsec.ByteString.Char8 as AP hiding (takeWhile)
 import           Data.Proxy
 import qualified Data.ByteString.Char8 as BS
 import           Data.Coerce (Coercible, coerce)
-import           Data.Time
+import           Data.Time hiding (Year)
 import           Data.Time.ISO8601.Duration
 import qualified Data.Time.ISO8601.Interval as I
 
@@ -119,7 +118,7 @@ truncateToSecond (unpack -> UTCTime d t) =
 --
 --
 newtype Schedule t = Schedule { unSchedule :: CronSchedule }
-  deriving (Eq, NFData)
+  deriving (Eq)
 instance Show (Schedule t) where show = show . unSchedule
 
 
@@ -154,14 +153,6 @@ data Interval t
   = StartDuration    t   Duration
   | StartEndDuration t t Duration
   deriving (Eq, Show, Typeable)
-
-intervalStart :: Interval t -> t
-intervalStart (StartDuration    s   _) = s
-intervalStart (StartEndDuration s _ _) = s
-
-intervalEnd :: Interval t -> Maybe t
-intervalEnd (StartDuration    _   _) = Nothing
-intervalEnd (StartEndDuration _ e _) = Just e
 
 interval :: Newtype t UTCTime => Duration -> t -> Either String (Interval t)
 interval d = Right . flip StartDuration d . truncateToSecond
@@ -202,7 +193,7 @@ instance (Ord t, Newtype t UTCTime) => Dimension (Interval t) where
 
   dsucc (StartEndDuration _ _ d) | isNullDuration d = const stopIteration
   dsucc (StartEndDuration _ e d) = \t ->
-    let next = pack ((addDuration d) (unpack (unQ t)))
+    let next = pack (addDuration d (unpack (unQ t)))
     in if next > e then stopIteration else yieldQuant next
                                       
 
@@ -262,7 +253,7 @@ instance (Ord t, Newtype t UTCTime) => Dimension (Interval t) where
   denumDown (StartDuration    s   _ ) a | a<s = return []
   denumDown (StartDuration    s   d') a =
     mapQuant . reverse . takeWhile (<= a) $ iterateDuration d' s
-  denumDown (StartEndDuration    s e _ ) a | a<s = return []
+  denumDown (StartEndDuration    s _ _ ) a | a<s = return []
   denumDown (StartEndDuration    s e d') a =
     mapQuant . reverse . takeWhile (<= min a e) $ iterateDuration d' s
   -- FIXME: This one is quite inefficient!
@@ -481,7 +472,7 @@ instance BoundedDimension DynHorizons where
                                              else yieldQuant $ last ds
 
 getHs :: (DimensionIx (Dependent d) -> b) -> Dim d b
-getHs f = getDep >>= return . f . unQ
+getHs f = f . unQ <$> getDep
 -- 
 -- Definimos aliases de tipo de dimensiones compuestas comunes para no tener que
 -- habilitar TypeOperators en los clientes.

@@ -76,9 +76,9 @@ module Sigym4.Dimension.Types (
 import Control.DeepSeq (NFData(rnf))
 import Control.Monad.Loops (unfoldrM, anyM)
 import Control.Monad.Reader (Reader, runReader, ask)
--- #if !MIN_VERSION_base(4,8,0)
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative (Applicative)
--- #endif
+#endif
 import Control.Newtype
 import Data.Typeable (Typeable)
 import Data.Maybe (catMaybes, isJust, fromJust)
