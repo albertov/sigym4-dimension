@@ -68,8 +68,8 @@ instance Dimension BCronField where
     return $ inInt lo hi m && m `mod` s == 0
   delem (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) m =
     return $ inInt (max lo a) (min hi b) m && m `mod` s == 0
-  delem (CF f@(StepField' _) _ _) _ =
-    error $ "delem(BCronField): Unimplemented " ++ show f
+  delem (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
+    return $ inInt lo hi m && m `mod` s == x
 
   -- dpred
   dpred (CF (Field Star) lo _) m
@@ -94,8 +94,8 @@ instance Dimension BCronField where
         (min hi b)
         s
   dpred f@(CF (ListField _) _ _) m = withDep (toCFs f `dpred` m)
-  dpred (CF f@(StepField' _) _ _) _ =
-    error $ "dpred(CronField): Unimplemented " ++ show f
+  dpred (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
+    yieldHead . dropWhile (>= unQ m) . reverse $ expandN x lo hi s
 
   -- succ
   dsucc (CF (Field Star) lo hi) m
@@ -116,8 +116,8 @@ instance Dimension BCronField where
   dsucc (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) m =
     yieldHead . dropWhile (<= unQ m) $ expand (max lo a) (min hi b) s
   dsucc f@(CF (ListField _) _ _) m = withDep (toCFs f `dsucc` m)
-  dsucc (CF f@(StepField' _) _ _) _ =
-    error $ "dsucc(CronField): Unimplemented " ++ show f
+  dsucc (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
+    yieldHead . dropWhile (<= unQ m) $ expandN x lo hi s
 
   -- dfloor
   dfloor (CF (Field Star) lo hi) m
@@ -137,8 +137,8 @@ instance Dimension BCronField where
   dfloor (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) m =
     yieldHead . dropWhile (> m) . reverse $ expand (max lo a) (min hi b) s
   dfloor f@(CF (ListField _) _ _) m = withDep (toCFs f `dfloor` m)
-  dfloor (CF f@(StepField' _) _ _) _ =
-    error $ "dfloor(CronField): Unimplemented " ++ show f
+  dfloor (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
+    yieldHead . dropWhile (> m) . reverse $ expandN x lo hi s
 
   -- dceiling
   dceiling (CF (Field Star) lo hi) m
@@ -158,11 +158,16 @@ instance Dimension BCronField where
   dceiling (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) m =
     yieldHead . dropWhile (< m) $ expand (max lo a) (min hi b) s
   dceiling f@(CF (ListField _) _ _) m = withDep (toCFs f `dceiling` m)
-  dceiling (CF f@(StepField' _) _ _) _ =
-    error $ "dceiling(CronField): Unimplemented " ++ show f
+  dceiling (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
+    yieldHead . dropWhile (< m) $ expandN x lo hi s
 
 expand :: Integral t => t -> t -> t -> [t]
-expand lo hi s = [i | i <- [lo .. hi], i `mod` s == 0]
+expand = expandN 0
+{-# INLINE expand #-}
+
+expandN :: Integral t => t -> t -> t -> t -> [t]
+expandN n lo hi s = [i | i <- [lo .. hi], i `mod` s == n]
+{-# INLINE expandN #-}
 
 instance BoundedDimension BCronField where
   dfirst (CF (Field Star) lo _) = yieldQuant lo
@@ -182,8 +187,10 @@ instance BoundedDimension BCronField where
       (x : _) -> yieldQuant x
   dfirst (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) =
     yieldHead $ expand (max lo a) (min hi b) s
-  dfirst (CF f@(StepField' _) _ _) =
-    error $ "dfirst(CronField): Unimplemented " ++ show f
+  dfirst (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) =
+    case expandN x lo hi s of
+      [] -> stopIteration
+      (a : _) -> yieldQuant a
 
   dlast (CF (Field Star) _ hi) = yieldQuant hi
   dlast (CF (Field (SpecificField' (SpecificField i))) lo hi)
@@ -200,8 +207,8 @@ instance BoundedDimension BCronField where
     yieldHead . reverse $ expand lo hi s
   dlast (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) =
     yieldHead . reverse $ expand (max lo a) (min hi b) s
-  dlast (CF f@(StepField' _) _ _) =
-    error $ "dlast(CronField): Unimplemented " ++ show f
+  dlast (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) =
+    yieldHead . reverse $ expandN x lo hi s
 
 data DayOfMonthDim = DomDim CronField CronField deriving (Show)
 
@@ -290,7 +297,7 @@ getDowDpm dom =
   getDep >>= \d ->
     let m :* y = unQ d
         dpm = daysPerMonth y m
-        (_, _, dow) = toWeekDate $ (fromGregorian (fromIntegral y) m dom)
+        (_, _, dow) = toWeekDate $ fromGregorian (fromIntegral y) m dom
      in return (dow, dpm)
 
 instance BoundedDimension DayOfMonthDim where

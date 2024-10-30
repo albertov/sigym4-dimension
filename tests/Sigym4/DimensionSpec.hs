@@ -78,6 +78,13 @@ spec = do
             ft2   = idfloor sched t2
         ft1 <= ft2
 
+      it "handles StepField with specificField" $ do
+        let sched = [cron|3/5 * * * *|]
+        unQ <$> idfloor sched (datetime 2012 3 1 0 5) `shouldBe` Just (datetime 2012 3 1 0 3)
+        unQ <$> idfloor sched (datetime 2012 3 1 0 8) `shouldBe` Just (datetime 2012 3 1 0 8)
+        unQ <$> idfloor sched (datetime 2012 3 1 0 10) `shouldBe` Just (datetime 2012 3 1 0 8)
+
+
 
     describe "leap years" $ do
       it "returns only feb 29" $ do
@@ -221,12 +228,18 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
           in a >= b && b >= c && isJust fa' && isJust fb' && isJust fc'  ==>
             (fa >= fb) && (fb >= fc) && (fa >= fc)
 
+    it "handles StepField with specificField" $ do
+      let sched = [cron|3/5 * * * *|]
+      unQ <$> idceiling sched (datetime 2012 3 1 0 5) `shouldBe` Just (datetime 2012 3 1 0 8)
+      unQ <$> idceiling sched (datetime 2012 3 1 0 8) `shouldBe` Just (datetime 2012 3 1 0 8)
+      unQ <$> idceiling sched (datetime 2012 3 1 0 10) `shouldBe` Just (datetime 2012 3 1 0 13)
+
   describe "idenumUp" $ do
 
     it "returns only elements of dimension" $ property $
         \(d::dim, i) ->
             let elems = takeSample $ idenumUp d i
-            in not (null elems) ==> all ((idelem d) . unQ) elems
+            in not (null elems) ==> all (idelem d . unQ) elems
 
     it "returns sorted elements" $ property $
         \(d::dim, i) ->
@@ -244,7 +257,7 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
     it "returns only elements of dimension" $ property $
         \(d::dim, i) ->
             let elems = takeSample $ idenumDown d i
-            in not (null elems) ==> all ((idelem d) . unQ) elems
+            in not (null elems) ==> all (idelem d . unQ) elems
 
     it "returns reversely sorted elements" $ property $
         \(d::dim, i) ->
@@ -409,7 +422,7 @@ arbitraryCronField range
                                ])
 
     stepField :: Gen CronField
-    stepField = StepField' <$> (StepField  <$> oneof [star, rangeField]
+    stepField = StepField' <$> (StepField  <$> oneof [star, rangeField, specificField]
                                            <*> choose ( max 1 (fst range)
                                                       , snd range))
 
