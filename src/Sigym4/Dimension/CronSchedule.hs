@@ -69,7 +69,7 @@ instance Dimension BCronField where
   delem (CF (StepField' (StepField (RangeField' (RangeField a b)) s)) lo hi) m =
     return $ inInt (max lo a) (min hi b) m && m `mod` s == 0
   delem (CF (StepField' (StepField (SpecificField' (SpecificField x)) s)) lo hi) m =
-    return $ inInt lo hi m && m `mod` s == x
+    return $ inInt lo hi m && (m-x) `mod` s == 0
 
   -- dpred
   dpred (CF (Field Star) lo _) m
@@ -166,7 +166,7 @@ expand = expandN 0
 {-# INLINE expand #-}
 
 expandN :: Integral t => t -> t -> t -> t -> [t]
-expandN n lo hi s = [i | i <- [lo .. hi], i `mod` s == n]
+expandN n lo hi s = [i | i <- [lo .. hi], (i-n) `mod` s == 0]
 {-# INLINE expandN #-}
 
 instance BoundedDimension BCronField where

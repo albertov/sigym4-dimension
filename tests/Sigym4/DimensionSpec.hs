@@ -84,6 +84,12 @@ spec = do
         unQ <$> idfloor sched (datetime 2012 3 1 0 8) `shouldBe` Just (datetime 2012 3 1 0 8)
         unQ <$> idfloor sched (datetime 2012 3 1 0 10) `shouldBe` Just (datetime 2012 3 1 0 8)
 
+    it "handles StepField with specificField on day" $ do
+      let sched = [cron|30 11 1/1 * *|]
+      unQ <$> idfloor sched (datetime 2012 3 1 0 5) `shouldBe` Just (datetime 2012 2 29 11 30)
+      unQ <$> idfloor sched (datetime 2012 3 1 11 30) `shouldBe` Just (datetime 2012 3 1 11 30)
+      unQ <$> idfloor sched (datetime 2012 3 1 12 00) `shouldBe` Just (datetime 2012 3 1 11 30)
+
 
 
     describe "leap years" $ do
@@ -233,6 +239,13 @@ dimensionSpec typeName _ = context ("Dimension ("++typeName++")") $ do
       unQ <$> idceiling sched (datetime 2012 3 1 0 5) `shouldBe` Just (datetime 2012 3 1 0 8)
       unQ <$> idceiling sched (datetime 2012 3 1 0 8) `shouldBe` Just (datetime 2012 3 1 0 8)
       unQ <$> idceiling sched (datetime 2012 3 1 0 10) `shouldBe` Just (datetime 2012 3 1 0 13)
+
+    it "handles StepField with specificField on day" $ do
+      let sched = [cron|30 11 1/1 * *|]
+      unQ <$> idceiling sched (datetime 2012 3 1 0 5) `shouldBe` Just (datetime 2012 3 1 11 30)
+      unQ <$> idceiling sched (datetime 2012 3 1 11 30) `shouldBe` Just (datetime 2012 3 1 11 30)
+      unQ <$> idceiling sched (datetime 2012 3 1 12 00) `shouldBe` Just (datetime 2012 3 2 11 30)
+
 
   describe "idenumUp" $ do
 
